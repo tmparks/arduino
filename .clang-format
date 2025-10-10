@@ -1,0 +1,30 @@
+# See [Clang-Format Style Options](https://clang.llvm.org/docs/ClangFormatStyleOptions.html)
+---
+AccessModifierOffset: -4
+AlignAfterOpenBracket: AlwaysBreak
+AlignEscapedNewlines: DontAlign
+AlignOperands: AlignAfterOperator
+AlwaysBreakTemplateDeclarations: true
+BinPackArguments: false
+BinPackParameters: false
+BraceWrapping:
+  BeforeCatch: true
+  BeforeElse: true
+BreakBeforeBinaryOperators: NonAssignment
+BreakBeforeBraces: Custom
+BreakConstructorInitializers: AfterColon
+ConstructorInitializerIndentWidth: 8
+ContinuationIndentWidth: 8
+IndentWidth: 4
+IndentWrappedFunctionNames: true
+Language: Cpp
+NamespaceIndentation: All
+PackConstructorInitializers: NextLine
+PenaltyExcessCharacter: 10
+PenaltyReturnTypeOnItsOwnLine: 200
+PointerAlignment: Left
+ReflowComments: false
+SpaceAfterLogicalNot: true
+SpaceInEmptyBlock: true
+Standard: c++17
+...

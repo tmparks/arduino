@@ -1,1 +1,14 @@
-default_fqbn: teensy:avr:teensy41
+profiles:
+  teensy:
+    fqbn: teensy:avr:teensy41
+    platforms:
+      - platform: teensy:avr (1.59.0)
+        platform_index_url: https://www.pjrc.com/teensy/package_teensy_index.json
+    libraries:
+      - Adafruit BusIO (1.17.4)
+      - Adafruit PM25 AQI Sensor (2.0.0)
+      - BME68x Sensor library (1.3.40408)
+      - dir: /Users/tom/Documents/Arduino/libraries/BSEC2_Software_Library
+      - DFRobot_C4001 (1.0.0)
+
+default_profile: teensy
