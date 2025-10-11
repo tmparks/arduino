@@ -1,6 +1,6 @@
 # https://docs.arduino.cc/arduino-cli/sketch-project-file/
 # Replace `{directories.user}` below with ...
-#   * Windows: `C:\Users\{username}\Documents\Arduino`
+#   * Windows: `C:/Users/{username}/Documents/Arduino`
 #   * macOS: `/Users/{username}/Documents/Arduino`
 #   * Linux: `/home/{username}/Arduino`
 #   * Replace `{username}` with your user name

@@ -11,36 +11,48 @@
     arduino-cli config set board_manager.additional_urls https://www.pjrc.com/teensy/package_teensy_index.json
     arduino-cli core update-index
     arduino-cli core install teensy:avr
-    cp platform.txt {directories.data}/packages/teensy/hardware/avr/*/platform.txt
     ```
-    * Replace `{directories.data}` with ...
-      (see [Open the Arduino15 folder](
-        https://support.arduino.cc/hc/en-us/articles/360018448279-Open-the-Arduino15-folder)
-      and [Default directories](
-        https://docs.arduino.cc/arduino-cli/configuration/#default-directories))
-      * Windows: `C:\Users\{username}\AppData\Local\Arduino15`
-      * macOS: `/Users/{username}/Library/Arduino15`
-      * Linux: `/home/{username}/.arduino15`
-      * Replace `{username}` with your user name
 
-3.  Configure sketch (edit `AirQuality/sketch.yaml`)
+3.  Modify platform configuration
+    (see [Open the Arduino15 folder](
+      https://support.arduino.cc/hc/en-us/articles/360018448279-Open-the-Arduino15-folder)
+    and [Default directories](
+      https://docs.arduino.cc/arduino-cli/configuration/#default-directories))
+    * Windows PowerShell
+      ```
+      copy platform.txt $Env:LOCALAPPDATA\Arduino15\packages\teensy\hardware\avr\1.59.0\
+      ```
+    * Windows Command Prompt
+      ```
+      copy platform.txt %LOCALAPPDATA%\Arduino15\packages\teensy\hardware\avr\1.59.0\
+      ```
+    * macOS
+      ```
+      cp platform.txt $HOME/Library/Arduino15/packages/teensy/hardware/avr/*/
+      ```
+    * Linux
+      ```
+      cp platform.txt $HOME/.arduino15/packages/teensy/hardware/avr/*/
+      ```
+
+4.  Modify sketch configuration (edit `AirQuality/sketch.yaml`)
     * Replace `{directories.user}` with ...
       (see [Sketch project file](
         https://docs.arduino.cc/arduino-cli/sketch-project-file/)
       and [Default directories](
         https://docs.arduino.cc/arduino-cli/configuration/#default-directories))
-      * Windows: `C:\Users\{username}\Documents\Arduino`
+      * Windows: `C:/Users/{username}/Documents/Arduino`
       * macOS: `/Users/{username}/Documents/Arduino`
       * Linux: `/home/{username}/Arduino`
-      * Replace `{username}` with your user name
+    * Replace `{username}` with your user name
 
-4.  Compile
+5.  Compile
     ```
     arduino-cli compile <sketch>
     ```
     * Replace `<sketch>` with the name of the sketch (e.g. AirQuality or Blink)
 
-5.  Upload
+6.  Upload
     ```
     arduino-cli board list
     arduino-cli upload --port <port> <sketch>
