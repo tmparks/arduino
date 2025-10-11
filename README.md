@@ -33,6 +33,7 @@
     * Linux
       ```
       cp platform.txt $HOME/.arduino15/packages/teensy/hardware/avr/*/
+      sudo wget --directory-prefix=/etc/udev/rules.d/ https://www.pjrc.com/teensy/00-teensy.rules
       ```
 
 4.  Modify sketch configuration (edit `AirQuality/sketch.yaml`)
