@@ -1,6 +1,7 @@
-#include "Adafruit_PM25AQI.h"
-#include "DFRobot_C4001.h"
 #include <ADC.h>
+#include <Adafruit_PM25AQI.h>
+#include <Arduino.h>
+#include <DFRobot_C4001.h>
 #include <SD.h>
 #include <SPI.h>
 #include <SdFat.h>
@@ -195,6 +196,82 @@ String currentDateString() {
     return String(buffer);
 }
 
+template<typename T>
+void printHeader(T& file) {
+    file.println(
+            "Timestamp,"
+            "Motion,"
+            "PM2.5_1MinAvg,"
+            "PM1.0_std,"
+            "PM2.5_std,"
+            "PM10_std,"
+            "PM1.0_env,"
+            "PM2.5_env,"
+            "PM10_env,"
+            "P>0.3um,"
+            "P>0.5um,"
+            "P>1.0um,"
+            "P>2.5um,"
+            "P>5.0um,"
+            "P>10um,"
+            "AQI_PM2.5,"
+            "AQI_PM10,"
+            "MiCS5524-Vs,"
+            "IAQ,"
+            "IAQ_Accuracy,"
+            "Temp,"
+            "Pressure,"
+            "Humidity,"
+            "Gas,"
+            "Stab_Status,"
+            "RunIn_Status,"
+            "2-PM1.0_std,"
+            "2-PM2.5_std,"
+            "2-PM10_std,"
+            "2-PM1.0_env,"
+            "2-PM2.5_env,"
+            "2-PM10_env,"
+            "2-P>0.3um,"
+            "2-P>0.5um,"
+            "2-P>1.0um,"
+            "2-P>2.5um,"
+            "2-P>5.0um,"
+            "2-P>10um,"
+            "2-AQI_PM2.5,"
+            "2-AQI_PM10");
+}
+
+template<typename T>
+void printPM25Data(T& file, const PM25_AQI_Data& data) {
+    file.print(data.pm10_standard);
+    file.print(",");
+    file.print(data.pm25_standard);
+    file.print(",");
+    file.print(data.pm100_standard);
+    file.print(",");
+    file.print(data.pm10_env);
+    file.print(",");
+    file.print(data.pm25_env);
+    file.print(",");
+    file.print(data.pm100_env);
+    file.print(",");
+    file.print(data.particles_03um);
+    file.print(",");
+    file.print(data.particles_05um);
+    file.print(",");
+    file.print(data.particles_10um);
+    file.print(",");
+    file.print(data.particles_25um);
+    file.print(",");
+    file.print(data.particles_50um);
+    file.print(",");
+    file.print(data.particles_100um);
+    file.print(",");
+    file.print(data.aqi_pm25_us);
+    file.print(",");
+    file.print(data.aqi_pm100_us);
+}
+
 // Open daily CSV file on internal SD, create and write header if needed
 File openDailyPM25Log() {
     String currentDate = currentDateString();
@@ -206,17 +283,7 @@ File openDailyPM25Log() {
         if (! SD.exists(filename)) {
             File f = SD.open(filename, FILE_WRITE);
             if (f) {
-                f.println(
-                        "Timestamp,Motion,PM2.5_1MinAvg,PM1.0_std,PM2.5_std,"
-                        "PM10_std,PM1.0_env,PM2.5_env,PM10_env,"
-                        "P>0.3um,P>0.5um,P>1.0um,P>2.5um,P>5.0um,P>10um,AQI_"
-                        "PM2.5,AQI_PM10,MiCS5524-Vs,"
-                        "IAQ,IAQ_Accuracy,Temp,Pressure,Humidity,Gas,Stab_"
-                        "Status,RunIn_Status,"
-                        "2-PM1.0_std,2-PM2.5_std,2-PM10_std,2-PM1.0_env,2-PM2."
-                        "5_env,2-PM10_env,"
-                        "2-P>0.3um,2-P>0.5um,2-P>1.0um,2-P>2.5um,2-P>5.0um,2-P>"
-                        "10um,2-AQI_PM2.5,2-AQI_PM10");
+                printHeader(f);
                 f.close();
             }
         }
@@ -255,17 +322,7 @@ FsFile openDailyPM25ExtLog() {
 
     if (writeHeader) {
         if (extFile.open(filename, O_WRITE | O_CREAT | O_TRUNC)) {
-            extFile.println(
-                    "Timestamp,Motion,PM2.5_1MinAvg,PM1.0_std,PM2.5_std,PM10_"
-                    "std,PM1.0_env,PM2.5_env,PM10_env,"
-                    "P>0.3um,P>0.5um,P>1.0um,P>2.5um,P>5.0um,P>10um,AQI_PM2.5,"
-                    "AQI_PM10,MiCS5524-Vs,"
-                    "IAQ,IAQ_Accuracy,Temp,Pressure,Humidity,Gas,Stab_Status,"
-                    "RunIn_Status,"
-                    "2-PM1.0_std,2-PM2.5_std,2-PM10_std,2-PM1.0_env,2-PM2.5_"
-                    "env,2-PM10_env,"
-                    "2-P>0.3um,2-P>0.5um,2-P>1.0um,2-P>2.5um,2-P>5.0um,2-P>"
-                    "10um,2-AQI_PM2.5,2-AQI_PM10");
+            printHeader(extFile);
             extFile.close();
             Serial.println("External SD: Header written");
         }
@@ -512,34 +569,7 @@ void loop() {
                     myFile.print(",");
                     myFile.print(pm25Avg, 2);
                     myFile.print(",");
-                    //Write 1st pm2.5 sensor data
-                    myFile.print(data.pm10_standard);
-                    myFile.print(",");
-                    myFile.print(data.pm25_standard);
-                    myFile.print(",");
-                    myFile.print(data.pm100_standard);
-                    myFile.print(",");
-                    myFile.print(data.pm10_env);
-                    myFile.print(",");
-                    myFile.print(data.pm25_env);
-                    myFile.print(",");
-                    myFile.print(data.pm100_env);
-                    myFile.print(",");
-                    myFile.print(data.particles_03um);
-                    myFile.print(",");
-                    myFile.print(data.particles_05um);
-                    myFile.print(",");
-                    myFile.print(data.particles_10um);
-                    myFile.print(",");
-                    myFile.print(data.particles_25um);
-                    myFile.print(",");
-                    myFile.print(data.particles_50um);
-                    myFile.print(",");
-                    myFile.print(data.particles_100um);
-                    myFile.print(",");
-                    myFile.print(data.aqi_pm25_us);
-                    myFile.print(",");
-                    myFile.print(data.aqi_pm100_us);
+                    printPM25Data(myFile, data);
                     myFile.print(",");
                     //Write Mics analog data
                     myFile.print(integratedVoltage, 6);
@@ -561,34 +591,8 @@ void loop() {
                     myFile.print(",");
                     myFile.print(bmeRunIn);
                     myFile.print(",");
-                    //Write 2nd pm2.5 sensor data
-                    myFile.print(data2.pm10_standard);
-                    myFile.print(",");
-                    myFile.print(data2.pm25_standard);
-                    myFile.print(",");
-                    myFile.print(data2.pm100_standard);
-                    myFile.print(",");
-                    myFile.print(data2.pm10_env);
-                    myFile.print(",");
-                    myFile.print(data2.pm25_env);
-                    myFile.print(",");
-                    myFile.print(data2.pm100_env);
-                    myFile.print(",");
-                    myFile.print(data2.particles_03um);
-                    myFile.print(",");
-                    myFile.print(data2.particles_05um);
-                    myFile.print(",");
-                    myFile.print(data2.particles_10um);
-                    myFile.print(",");
-                    myFile.print(data2.particles_25um);
-                    myFile.print(",");
-                    myFile.print(data2.particles_50um);
-                    myFile.print(",");
-                    myFile.print(data2.particles_100um);
-                    myFile.print(",");
-                    myFile.print(data2.aqi_pm25_us);
-                    myFile.print(",");
-                    myFile.println(data2.aqi_pm100_us);
+                    printPM25Data(myFile, data2);
+                    myFile.println();
                     myFile.close();
                     Serial.println("Data recorded to internal SD card");
                 }
@@ -607,34 +611,7 @@ void loop() {
                     extFile.print(",");
                     extFile.print(pm25Avg, 2);
                     extFile.print(",");
-                    //Write 1st pm2.5 sensor data
-                    extFile.print(data.pm10_standard);
-                    extFile.print(",");
-                    extFile.print(data.pm25_standard);
-                    extFile.print(",");
-                    extFile.print(data.pm100_standard);
-                    extFile.print(",");
-                    extFile.print(data.pm10_env);
-                    extFile.print(",");
-                    extFile.print(data.pm25_env);
-                    extFile.print(",");
-                    extFile.print(data.pm100_env);
-                    extFile.print(",");
-                    extFile.print(data.particles_03um);
-                    extFile.print(",");
-                    extFile.print(data.particles_05um);
-                    extFile.print(",");
-                    extFile.print(data.particles_10um);
-                    extFile.print(",");
-                    extFile.print(data.particles_25um);
-                    extFile.print(",");
-                    extFile.print(data.particles_50um);
-                    extFile.print(",");
-                    extFile.print(data.particles_100um);
-                    extFile.print(",");
-                    extFile.print(data.aqi_pm25_us);
-                    extFile.print(",");
-                    extFile.print(data.aqi_pm100_us);
+                    printPM25Data(extFile, data);
                     extFile.print(",");
                     //Write Mics analog data
                     extFile.print(integratedVoltage, 6);
@@ -656,34 +633,8 @@ void loop() {
                     extFile.print(",");
                     extFile.print(bmeRunIn);
                     extFile.print(",");
-                    //Write 2nd pm2.5 sensor data
-                    extFile.print(data2.pm10_standard);
-                    extFile.print(",");
-                    extFile.print(data2.pm25_standard);
-                    extFile.print(",");
-                    extFile.print(data2.pm100_standard);
-                    extFile.print(",");
-                    extFile.print(data2.pm10_env);
-                    extFile.print(",");
-                    extFile.print(data2.pm25_env);
-                    extFile.print(",");
-                    extFile.print(data2.pm100_env);
-                    extFile.print(",");
-                    extFile.print(data2.particles_03um);
-                    extFile.print(",");
-                    extFile.print(data2.particles_05um);
-                    extFile.print(",");
-                    extFile.print(data2.particles_10um);
-                    extFile.print(",");
-                    extFile.print(data2.particles_25um);
-                    extFile.print(",");
-                    extFile.print(data2.particles_50um);
-                    extFile.print(",");
-                    extFile.print(data2.particles_100um);
-                    extFile.print(",");
-                    extFile.print(data2.aqi_pm25_us);
-                    extFile.print(",");
-                    extFile.println(data2.aqi_pm100_us);
+                    printPM25Data(extFile, data);
+                    extFile.println();
                     extFile.close();
                     Serial.println("Data recorded to external SD card");
                 }
