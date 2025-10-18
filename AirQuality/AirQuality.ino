@@ -8,6 +8,12 @@
 #include <Wire.h>
 #include "DFRobot_C4001.h"
 
+// Treat all warings as errors, regardless of Arduino platform configuration.
+#pragma GCC diagnostic push
+#pragma GCC diagnostic error "-Wall"
+#pragma GCC diagnostic error "-Wextra"
+#pragma GCC diagnostic error "-Wpedantic"
+
 // Initialize ADC library for analog gas sensor (MiCS5524)
 ADC *adc = new ADC();
 
@@ -116,7 +122,7 @@ void checkBsecStatus(Bsec2 bsec) {
 }
 
 // Callback for new data from BSEC2
-void newDataCallback(const bme68xData data, const bsecOutputs outputs, Bsec2 bsec) {
+void newDataCallback(const bme68xData, const bsecOutputs outputs, Bsec2) {
   if (!outputs.nOutputs) return;
   for (uint8_t i = 0; i < outputs.nOutputs; i++) {
     const bsecData output  = outputs.output[i];
@@ -549,3 +555,5 @@ void loop() {
     integratedVoltage = 0.0;  // Reset integration for next interval
   }
 }
+
+#pragma GCC diagnostic pop
