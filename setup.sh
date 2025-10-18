@@ -30,15 +30,11 @@ arduino-cli core install teensy:avr@$TEENSY_VERSION
 ARDUINO_DIRECTORIES_DATA=$(arduino-cli config get directories.data)
 ARDUINO_DIRECTORIES_USER=$(arduino-cli config get directories.user)
 
-# Modify platform configuration to enable precompled libraries.
-# Note: trailing space ensures idempotence.
-# https://github.com/MarkusLange/Bosch-BSEC2-Library/tree/master#4-modify-the-platformtxt-file
-FILE=$ARDUINO_DIRECTORIES_DATA/packages/teensy/hardware/avr/$TEENSY_VERSION/platform.txt
-EXPRESSION="\({build.flags.libs}\)\$"
-REPLACEMENT="{compiler.libraries.ldflags} \\1 \ncompiler.libraries.ldflags="
-$SED s/"$EXPRESSION"/"$REPLACEMENT"/ $FILE
+# Global platform configuration.
+mkdir -p $ARDUINO_DIRECTORIES_USER/hardware/
+cp $HERE/platform.txt $ARDUINO_DIRECTORIES_USER/hardware/
 
-# Modify sketch configuration with user directory.
+# Modify sketch configuration.
 # Note: % delimiter allows / in replacement.
 FILE=$HERE/AirQuality/sketch.yaml
 EXPRESSION="{directories.user}\(/libraries/\)"
