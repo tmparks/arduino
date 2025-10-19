@@ -1,3 +1,5 @@
+#include "csv.h"
+
 #include <ADC.h>
 #include <Adafruit_PM25AQI.h>
 #include <Arduino.h>
@@ -10,10 +12,13 @@
 #include <bsec2.h>
 
 // Treat all warings as errors, regardless of Arduino platform configuration.
-#pragma GCC diagnostic push
+// Affects all .ino files in the sketch folder.
+// https://docs.arduino.cc/arduino-cli/sketch-build-process/#pre-processing
 #pragma GCC diagnostic error "-Wall"
 #pragma GCC diagnostic error "-Wextra"
 #pragma GCC diagnostic error "-Wpedantic"
+#pragma GCC diagnostic error "-Wsign-compare"    // see platform.txt
+#pragma GCC diagnostic error "-Wunused-variable" // see platform.txt
 
 // Initialize ADC library for analog gas sensor (MiCS5524)
 ADC* adc = new ADC();
@@ -194,82 +199,6 @@ String currentDateString() {
     char buffer[11];
     sprintf(buffer, "%04d-%02d-%02d", year(), month(), day());
     return String(buffer);
-}
-
-template<typename T>
-void printHeader(T& file) {
-    file.println(
-            "Timestamp,"
-            "Motion,"
-            "PM2.5_1MinAvg,"
-            "PM1.0_std,"
-            "PM2.5_std,"
-            "PM10_std,"
-            "PM1.0_env,"
-            "PM2.5_env,"
-            "PM10_env,"
-            "P>0.3um,"
-            "P>0.5um,"
-            "P>1.0um,"
-            "P>2.5um,"
-            "P>5.0um,"
-            "P>10um,"
-            "AQI_PM2.5,"
-            "AQI_PM10,"
-            "MiCS5524-Vs,"
-            "IAQ,"
-            "IAQ_Accuracy,"
-            "Temp,"
-            "Pressure,"
-            "Humidity,"
-            "Gas,"
-            "Stab_Status,"
-            "RunIn_Status,"
-            "2-PM1.0_std,"
-            "2-PM2.5_std,"
-            "2-PM10_std,"
-            "2-PM1.0_env,"
-            "2-PM2.5_env,"
-            "2-PM10_env,"
-            "2-P>0.3um,"
-            "2-P>0.5um,"
-            "2-P>1.0um,"
-            "2-P>2.5um,"
-            "2-P>5.0um,"
-            "2-P>10um,"
-            "2-AQI_PM2.5,"
-            "2-AQI_PM10");
-}
-
-template<typename T>
-void printPM25Data(T& file, const PM25_AQI_Data& data) {
-    file.print(data.pm10_standard);
-    file.print(",");
-    file.print(data.pm25_standard);
-    file.print(",");
-    file.print(data.pm100_standard);
-    file.print(",");
-    file.print(data.pm10_env);
-    file.print(",");
-    file.print(data.pm25_env);
-    file.print(",");
-    file.print(data.pm100_env);
-    file.print(",");
-    file.print(data.particles_03um);
-    file.print(",");
-    file.print(data.particles_05um);
-    file.print(",");
-    file.print(data.particles_10um);
-    file.print(",");
-    file.print(data.particles_25um);
-    file.print(",");
-    file.print(data.particles_50um);
-    file.print(",");
-    file.print(data.particles_100um);
-    file.print(",");
-    file.print(data.aqi_pm25_us);
-    file.print(",");
-    file.print(data.aqi_pm100_us);
 }
 
 // Open daily CSV file on internal SD, create and write header if needed
@@ -647,5 +576,3 @@ void loop() {
         integratedVoltage = 0.0; // Reset integration for next interval
     }
 }
-
-#pragma GCC diagnostic pop
