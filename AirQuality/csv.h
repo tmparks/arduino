@@ -1,12 +1,27 @@
 #pragma once
 #include "bme.h"
 #include <Adafruit_PM25AQI.h>
+#include <FS.h>
+#include <SdFat.h>
 
-template <typename T>
-void printHeader(T& file);
+void printHeader(File& file);
 
-template <typename T>
-void printPM25Data(T& file, const PM25_AQI_Data& data);
+void printHeader(FsFile& file);
 
-template <typename T>
-void printBMEData(T& file, const bmeData& data);
+void printRow(
+        File& file,
+        bool motion,
+        float pm25avg,
+        float micsVoltage,
+        const bmeData& envData,
+        const PM25_AQI_Data& aqiData1,
+        const PM25_AQI_Data& aqiData2);
+
+void printRow(
+        FsFile& file,
+        bool motion,
+        float pm25avg,
+        float micsVoltage,
+        const bmeData& envData,
+        const PM25_AQI_Data& aqiData1,
+        const PM25_AQI_Data& aqiData2);

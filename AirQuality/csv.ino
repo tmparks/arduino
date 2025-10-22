@@ -3,7 +3,7 @@
 #include "csv.h"
 
 template <typename T>
-void printHeader(T& file) {
+void printHeaderImpl(T& file) {
     file.println(
             "Timestamp,"
             "Motion,"
@@ -48,7 +48,32 @@ void printHeader(T& file) {
 }
 
 template <typename T>
-void printPM25Data(T& file, const PM25_AQI_Data& data) {
+void printRowImpl(
+        T& file,
+        bool motion,
+        float pm25avg,
+        float micsVoltage,
+        const bmeData& envData,
+        const PM25_AQI_Data& aqiData1,
+        const PM25_AQI_Data& aqiData2) {
+    file.print(currentDateTime());
+    file.print(",");
+    file.print(motion);
+    file.print(",");
+    file.print(pm25avg, 2);
+    file.print(",");
+    printPM25DataImpl(file, aqiData1);
+    file.print(",");
+    file.print(micsVoltage, 6);
+    file.print(",");
+    printBMEDataImpl(file, envData);
+    file.print(",");
+    printPM25DataImpl(file, aqiData2);
+    file.println();
+}
+
+template <typename T>
+void printPM25DataImpl(T& file, const PM25_AQI_Data& data) {
     file.print(data.pm10_standard);
     file.print(",");
     file.print(data.pm25_standard);
@@ -79,7 +104,7 @@ void printPM25Data(T& file, const PM25_AQI_Data& data) {
 }
 
 template <typename T>
-void printBMEData(T& file, const bmeData& data) {
+void printBMEDataImpl(T& file, const bmeData& data) {
     file.print(data.iaq);
     file.print(",");
     file.print(data.iaqAcc);
@@ -95,4 +120,30 @@ void printBMEData(T& file, const bmeData& data) {
     file.print(data.stab);
     file.print(",");
     file.print(data.runIn);
+}
+
+void printHeader(File& file) { printHeaderImpl(file); }
+
+void printHeader(FsFile& file) { printHeaderImpl(file); }
+
+void printRow(
+        File& file,
+        bool motion,
+        float pm25avg,
+        float micsVoltage,
+        const bmeData& envData,
+        const PM25_AQI_Data& aqiData1,
+        const PM25_AQI_Data& aqiData2) {
+    printRowImpl(file, motion, pm25avg, micsVoltage, envData, aqiData1, aqiData2);
+}
+
+void printRow(
+        FsFile& file,
+        bool motion,
+        float pm25avg,
+        float micsVoltage,
+        const bmeData& envData,
+        const PM25_AQI_Data& aqiData1,
+        const PM25_AQI_Data& aqiData2) {
+    printRowImpl(file, motion, pm25avg, micsVoltage, envData, aqiData1, aqiData2);
 }

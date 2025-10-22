@@ -492,21 +492,14 @@ void loop() {
             if (sdOK) {
                 myFile = openDailyPM25Log();
                 if (myFile) {
-                    myFile.print(currentDateTime());
-                    myFile.print(",");
-                    myFile.print(dfMotion);
-                    myFile.print(",");
-                    myFile.print(pm25Avg, 2);
-                    myFile.print(",");
-                    printPM25Data(myFile, data);
-                    myFile.print(",");
-                    //Write Mics analog data
-                    myFile.print(integratedVoltage, 6);
-                    myFile.print(",");
-                    printBMEData(myFile, envData);
-                    myFile.print(",");
-                    printPM25Data(myFile, data2);
-                    myFile.println();
+                    printRow(
+                            myFile,
+                            dfMotion,
+                            pm25Avg,
+                            integratedVoltage,
+                            envData,
+                            data,
+                            data2);
                     myFile.close();
                     Serial.println("Data recorded to internal SD card");
                 }
@@ -519,21 +512,14 @@ void loop() {
             if (sdExtOK) {
                 extFile = openDailyPM25ExtLog();
                 if (extFile) {
-                    extFile.print(currentDateTime());
-                    extFile.print(",");
-                    extFile.print(dfMotion);
-                    extFile.print(",");
-                    extFile.print(pm25Avg, 2);
-                    extFile.print(",");
-                    printPM25Data(extFile, data);
-                    extFile.print(",");
-                    //Write Mics analog data
-                    extFile.print(integratedVoltage, 6);
-                    extFile.print(",");
-                    printBMEData(extFile, envData);
-                    extFile.print(",");
-                    printPM25Data(extFile, data);
-                    extFile.println();
+                    printRow(
+                            extFile,
+                            dfMotion,
+                            pm25Avg,
+                            integratedVoltage,
+                            envData,
+                            data,
+                            data2);
                     extFile.close();
                     Serial.println("Data recorded to external SD card");
                 }
