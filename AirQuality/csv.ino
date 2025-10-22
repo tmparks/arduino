@@ -77,3 +77,22 @@ void printPM25Data(T& file, const PM25_AQI_Data& data) {
     file.print(",");
     file.print(data.aqi_pm100_us);
 }
+
+template <typename T>
+void printBMEData(T& file, const bmeData& data) {
+    file.print(data.iaq);
+    file.print(",");
+    file.print(data.iaqAcc);
+    file.print(",");
+    file.print(data.temp);
+    file.print(",");
+    file.print(data.pres);
+    file.print(",");
+    file.print(data.hum);
+    file.print(",");
+    file.print(data.gas);
+    file.print(",");
+    file.print(data.stab);
+    file.print(",");
+    file.print(data.runIn);
+}

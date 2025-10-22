@@ -1,3 +1,4 @@
+#include "bme.h"
 #include "csv.h"
 
 #include <ADC.h>
@@ -102,8 +103,7 @@ const unsigned long DEFAULT_TIME = 1357041600; // Jan 1, 2013 fallback
 #define ERROR_DUR 1000
 Bsec2 envSensor; // BSEC2 driver for BME688
 // Output values from BSEC2
-float bmeIaq = NAN, bmeIaqAcc = NAN, bmeTemp = NAN, bmePres = NAN;
-float bmeHum = NAN, bmeGas = NAN, bmeStab = NAN, bmeRunIn = NAN;
+auto envData = bmeData{};
 
 // Flash error code using LED
 void errLeds() {
@@ -141,26 +141,26 @@ void newDataCallback(const bme68xData, const bsecOutputs outputs, Bsec2) {
         const bsecData output = outputs.output[i];
         switch (output.sensor_id) {
         case BSEC_OUTPUT_IAQ:
-            bmeIaq = output.signal;
-            bmeIaqAcc = output.accuracy;
+            envData.iaq = output.signal;
+            envData.iaqAcc = output.accuracy;
             break;
         case BSEC_OUTPUT_RAW_TEMPERATURE:
-            bmeTemp = output.signal;
+            envData.temp = output.signal;
             break;
         case BSEC_OUTPUT_RAW_PRESSURE:
-            bmePres = output.signal;
+            envData.pres = output.signal;
             break;
         case BSEC_OUTPUT_RAW_HUMIDITY:
-            bmeHum = output.signal;
+            envData.hum = output.signal;
             break;
         case BSEC_OUTPUT_RAW_GAS:
-            bmeGas = output.signal;
+            envData.gas = output.signal;
             break;
         case BSEC_OUTPUT_STABILIZATION_STATUS:
-            bmeStab = output.signal;
+            envData.stab = output.signal;
             break;
         case BSEC_OUTPUT_RUN_IN_STATUS:
-            bmeRunIn = output.signal;
+            envData.runIn = output.signal;
             break;
         }
     }
@@ -503,22 +503,7 @@ void loop() {
                     //Write Mics analog data
                     myFile.print(integratedVoltage, 6);
                     myFile.print(",");
-                    //Write BME688 data
-                    myFile.print(bmeIaq);
-                    myFile.print(",");
-                    myFile.print(bmeIaqAcc);
-                    myFile.print(",");
-                    myFile.print(bmeTemp);
-                    myFile.print(",");
-                    myFile.print(bmePres);
-                    myFile.print(",");
-                    myFile.print(bmeHum);
-                    myFile.print(",");
-                    myFile.print(bmeGas);
-                    myFile.print(",");
-                    myFile.print(bmeStab);
-                    myFile.print(",");
-                    myFile.print(bmeRunIn);
+                    printBMEData(myFile, envData);
                     myFile.print(",");
                     printPM25Data(myFile, data2);
                     myFile.println();
@@ -545,22 +530,7 @@ void loop() {
                     //Write Mics analog data
                     extFile.print(integratedVoltage, 6);
                     extFile.print(",");
-                    //Write BME688 data
-                    extFile.print(bmeIaq);
-                    extFile.print(",");
-                    extFile.print(bmeIaqAcc);
-                    extFile.print(",");
-                    extFile.print(bmeTemp);
-                    extFile.print(",");
-                    extFile.print(bmePres);
-                    extFile.print(",");
-                    extFile.print(bmeHum);
-                    extFile.print(",");
-                    extFile.print(bmeGas);
-                    extFile.print(",");
-                    extFile.print(bmeStab);
-                    extFile.print(",");
-                    extFile.print(bmeRunIn);
+                    printBMEData(extFile, envData);
                     extFile.print(",");
                     printPM25Data(extFile, data);
                     extFile.println();
