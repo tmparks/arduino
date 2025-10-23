@@ -44,18 +44,15 @@ unsigned long previousMicros;
 DFRobot_C4001_UART radar(&Serial7, 9600);
 bool dfMotion = false;
 
-// Internal SD card
-File myFile;
-FsFile extFile;
-bool sdFull = false;
-bool sdOK = false;
+File internalFile;
+bool internalOK = false;
+bool internalFull = false;
 
-// External SD card
-const int chipSelect_ext = 0;
-SdFat SD_ext;
-bool sdExtOK = false;
-bool sdExtFull = false;
-bool triedReinit = false;
+const int externalChipSelect = 0;
+SdFat externalSD;
+FsFile externalFile;
+bool externalOK = false;
+bool externalFull = false;
 
 // PM2.5 sensor (Adafruit PM5003 or equivalent)
 Adafruit_PM25AQI aqi = Adafruit_PM25AQI();
@@ -238,11 +235,11 @@ FsFile openDailyPM25ExtLog() {
     // Check if file exists or is empty (new)
     bool writeHeader = false;
 
-    if (! SD_ext.exists(filename)) {
+    if (! externalSD.exists(filename)) {
         writeHeader = true;
     }
     else {
-        FsFile temp = SD_ext.open(filename, O_READ);
+        FsFile temp = externalSD.open(filename, O_READ);
         if (temp && temp.size() == 0) {
             writeHeader = true;
         }
@@ -250,9 +247,9 @@ FsFile openDailyPM25ExtLog() {
     }
 
     if (writeHeader) {
-        if (extFile.open(filename, O_WRITE | O_CREAT | O_TRUNC)) {
-            printHeader(extFile);
-            extFile.close();
+        if (externalFile.open(filename, O_WRITE | O_CREAT | O_TRUNC)) {
+            printHeader(externalFile);
+            externalFile.close();
             Serial.println("External SD: Header written");
         }
         else {
@@ -264,8 +261,8 @@ FsFile openDailyPM25ExtLog() {
     }
 
     // Now open the file for appending
-    extFile.open(filename, O_RDWR | O_CREAT | O_AT_END);
-    return extFile;
+    externalFile.open(filename, O_RDWR | O_CREAT | O_AT_END);
+    return externalFile;
 }
 
 // If external SD fails, retry every 5 seconds and blink LED as warning
@@ -280,13 +277,13 @@ void checkExternalSD() {
         lastBlink = millis();
     }
 
-    if (! sdExtOK && millis() - lastRetry >= 5000) {
+    if (! externalOK && millis() - lastRetry >= 5000) {
         Serial.println("Retrying external SD card initialization...");
-        sdExtOK = SD_ext.begin(
-                SdSpiConfig(chipSelect_ext, SHARED_SPI, SD_SCK_MHZ(8), &SPI1));
-        if (sdExtOK) {
+        externalOK = externalSD.begin(
+                SdSpiConfig(externalChipSelect, SHARED_SPI, SD_SCK_MHZ(8), &SPI1));
+        if (externalOK) {
             Serial.println("External SD card reinitialized.");
-            sdExtFull = false;
+            externalFull = false;
             digitalWrite(PANIC_LED, LOW);
         }
         else {
@@ -331,10 +328,10 @@ void setup() {
 
     // Initialize internal SD
     Serial.println("Initializing SD card...");
-    sdOK = SD.begin(BUILTIN_SDCARD);
-    if (! sdOK) {
+    internalOK = SD.begin(BUILTIN_SDCARD);
+    if (! internalOK) {
         Serial.println("SD card initialization failed!");
-        sdFull = true;
+        internalFull = true;
     }
     else {
         Serial.println("SD card initialization done.");
@@ -342,11 +339,11 @@ void setup() {
 
     // Initialize external SD
     Serial.println("Initializing external SD card...");
-    sdExtOK = SD_ext.begin(
-            SdSpiConfig(chipSelect_ext, SHARED_SPI, SD_SCK_MHZ(8), &SPI1));
-    if (! sdExtOK) {
+    externalOK = externalSD.begin(
+            SdSpiConfig(externalChipSelect, SHARED_SPI, SD_SCK_MHZ(8), &SPI1));
+    if (! externalOK) {
         Serial.println("External SD card initialization failed!");
-        sdExtFull = true;
+        externalFull = true;
     }
     else {
         Serial.println("External SD card initialization done.");
@@ -411,7 +408,7 @@ void loop() {
         checkBsecStatus(envSensor);
 
     // Retry external SD if failed previously
-    if (sdFull || (! sdExtOK && sdExtFull)) {
+    if (internalFull || (! externalOK && externalFull)) {
         checkExternalSD();
         return;
     }
@@ -489,43 +486,43 @@ void loop() {
             }
 
             // Log to internal SD
-            if (sdOK) {
-                myFile = openDailyPM25Log();
-                if (myFile) {
+            if (internalOK) {
+                internalFile = openDailyPM25Log();
+                if (internalFile) {
                     printRow(
-                            myFile,
+                            internalFile,
                             dfMotion,
                             pm25Avg,
                             integratedVoltage,
                             envData,
                             data,
                             data2);
-                    myFile.close();
+                    internalFile.close();
                     Serial.println("Data recorded to internal SD card");
                 }
                 else {
-                    sdFull = true;
+                    internalFull = true;
                 }
             }
 
             // Log to external SD
-            if (sdExtOK) {
-                extFile = openDailyPM25ExtLog();
-                if (extFile) {
+            if (externalOK) {
+                externalFile = openDailyPM25ExtLog();
+                if (externalFile) {
                     printRow(
-                            extFile,
+                            externalFile,
                             dfMotion,
                             pm25Avg,
                             integratedVoltage,
                             envData,
                             data,
                             data2);
-                    extFile.close();
+                    externalFile.close();
                     Serial.println("Data recorded to external SD card");
                 }
                 else {
-                    sdExtFull = true;
-                    sdExtOK = false;
+                    externalFull = true;
+                    externalOK = false;
                 }
             }
         }
