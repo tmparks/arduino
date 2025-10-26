@@ -7,7 +7,7 @@
 # https://docs.arduino.cc/arduino-cli/sketch-project-file/
 # https://support.arduino.cc/hc/en-us/articles/360018448279-Open-the-Arduino15-folder
 
-HERE=$(realpath $(dirname "$0")) # location of this script
+HERE="$(realpath $(dirname "$0"))" # location of this script
 TEENSY_VERSION=1.59.0
 BSEC2_VERSION=1.6.2400
 
@@ -27,16 +27,16 @@ arduino-cli config set board_manager.additional_urls https://www.pjrc.com/teensy
 arduino-cli core update-index
 arduino-cli core install teensy:avr@$TEENSY_VERSION
 
-ARDUINO_DIRECTORIES_DATA=$(arduino-cli config get directories.data)
-ARDUINO_DIRECTORIES_USER=$(arduino-cli config get directories.user)
+ARDUINO_DIRECTORIES_DATA="$(arduino-cli config get directories.data)"
+ARDUINO_DIRECTORIES_USER="$(arduino-cli config get directories.user)"
 
 # Global platform configuration.
-mkdir -p $ARDUINO_DIRECTORIES_USER/hardware/
-cp $HERE/platform.txt $ARDUINO_DIRECTORIES_USER/hardware/
+mkdir -p "$ARDUINO_DIRECTORIES_USER/hardware/"
+cp "$HERE/platform.txt" "$ARDUINO_DIRECTORIES_USER/hardware/"
 
 # Modify sketch configuration.
 # Note: % delimiter allows / in replacement.
-FILE=$HERE/AirQuality/sketch.yaml
+FILE="$HERE/AirQuality/sketch.yaml"
 EXPRESSION="{directories.user}\(/libraries/\)"
 REPLACEMENT="$ARDUINO_DIRECTORIES_USER\\1"
-$SED s%"$EXPRESSION"%"$REPLACEMENT"% $FILE
+$SED s%"$EXPRESSION"%"$REPLACEMENT"% "$FILE"
