@@ -1,0 +1,15 @@
+# https://docs.arduino.cc/arduino-cli/platform-specification/#global-platformtxt
+
+# Modify platform configuration to enable precompled libraries.
+# https://github.com/MarkusLange/Bosch-BSEC2-Library/tree/master#4-modify-the-platformtxt-file
+compiler.libraries.ldflags=
+teensy41.build.flags.libs=-larm_cortexM7lfsp_math -lm -lstdc++
+build.flags.libs={compiler.libraries.ldflags} {teensy41.build.flags.libs}
+
+# Modify platform configuration to enable extra C++ compiler flags.
+compiler.cpp.extra_flags=
+teensy41.build.flags.cpp=-std=gnu++17 -fno-exceptions -fpermissive -fno-rtti -fno-threadsafe-statics -felide-constructors -Wno-error=narrowing
+build.flags.cpp={compiler.cpp.extra_flags} {teensy41.build.flags.cpp}
+
+# Suppress compiler warnings from Adafruit library
+compiler.cpp.extra_flags=-Wno-sign-compare -Wno-unused-variable
