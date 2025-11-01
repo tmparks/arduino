@@ -1,6 +1,11 @@
+// https://docs.arduino.cc/learn/electronics/low-power/
+// https://www.pjrc.com/teensy/low_power.html
+constexpr auto lowPower = true; // Use power-saving measures.
+
 #include "bme.h"
 #include "csv.h"
 
+#include <avr/sleep.h>
 #include <ADC.h>
 #include <Adafruit_PM25AQI.h>
 #include <Arduino.h>
@@ -12,14 +17,21 @@
 #include <Wire.h>
 #include <bsec2.h>
 
-// Treat all warings as errors, regardless of Arduino platform configuration.
+// Re-enable warnings that were supressed for Adafruit library.
 // Affects all .ino files in the sketch folder.
+// See compiler.cpp.extra_flags in platform.txt.
 // https://docs.arduino.cc/arduino-cli/sketch-build-process/#pre-processing
-#pragma GCC diagnostic error "-Wall"
-#pragma GCC diagnostic error "-Wextra"
-#pragma GCC diagnostic error "-Wpedantic"
-#pragma GCC diagnostic error "-Wsign-compare"    // see platform.txt
-#pragma GCC diagnostic error "-Wunused-variable" // see platform.txt
+#pragma GCC diagnostic error "-Wsign-compare"
+#pragma GCC diagnostic error "-Wunused-variable"
+
+void sleep(int mode) {
+    set_sleep_mode(mode);
+    noInterrupts();
+    sleep_enable();
+    interrupts();
+    sleep_cpu();
+    sleep_disable();
+}
 
 // Initialize ADC library for analog gas sensor (MiCS5524)
 ADC* adc = new ADC();
@@ -293,7 +305,17 @@ void checkExternalSD() {
     }
 }
 
+// https://www.pjrc.com/teensy/low_power.html
 void setup() {
+    if (lowPower) {
+        // Save power by seting *all* pins to OUTPUT.
+        // INPUT pins must be set later.
+        // Unused pins will remain in OUTPUT mode.
+        for (auto pin = 0; pin < NUM_DIGITAL_PINS; pin++) {
+            pinMode(pin, OUTPUT);
+        }
+    }
+
     Serial.begin(9600);
     Wire.begin();
     radar.begin();
@@ -390,6 +412,11 @@ void setup() {
 
     intervalStartMillis = millis();
     previousMicros = micros();
+
+    if (lowPower) {
+        Serial.end(); // Save power by disabling USB.
+        sleep(SLEEP_MODE_PWR_DOWN);
+    }
 }
 
 void loop() {
@@ -527,5 +554,8 @@ void loop() {
             }
         }
         integratedVoltage = 0.0; // Reset integration for next interval
+    }
+    if (lowPower) {
+        sleep(SLEEP_MODE_IDLE);
     }
 }

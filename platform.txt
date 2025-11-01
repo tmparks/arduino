@@ -11,5 +11,6 @@ compiler.cpp.extra_flags=
 teensy41.build.flags.cpp=-std=gnu++17 -fno-exceptions -fpermissive -fno-rtti -fno-threadsafe-statics -felide-constructors -Wno-error=narrowing
 build.flags.cpp={compiler.cpp.extra_flags} {teensy41.build.flags.cpp}
 
+# Treat all warnings as errors.
 # Suppress compiler warnings from Adafruit library
-compiler.cpp.extra_flags=-Wno-sign-compare -Wno-unused-variable
+compiler.cpp.extra_flags=-Werror -Wall -Wextra -Wpedantic -Wno-sign-compare -Wno-unused-variable
