@@ -7,7 +7,7 @@
 
 profiles:
   teensy:
-    fqbn: teensy:avr:teensy41
+    fqbn: teensy:avr:teensy41:speed=24
     platforms:
       - platform: teensy:avr
     libraries:

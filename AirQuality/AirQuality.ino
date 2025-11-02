@@ -1,3 +1,13 @@
+// Box number (incorporated into file names)
+constexpr int BOX_NUMBER = 1;
+
+// PM2.5 high breakpoints
+constexpr float PM25_GOOD = 12.0;
+constexpr float PM25_MODERATE = 35.4;
+constexpr float PM25_UNHEALTHY_SENSITIVE = 55.4;
+constexpr float PM25_UNHEALTHY = 150.4;
+constexpr float PM25_VERY_UNHEALTHY = 250.4;
+
 #include <SPI.h>
 #include <SD.h>
 #include <SdFat.h>
@@ -56,14 +66,12 @@ int pm25Count = 0; // Actual number of samples stored (max 60)
 
 //PM2.5 breakpoints
 String pm25Category(float avg) {
-  if (avg <= 12.0) return "Good";
-  else if (avg <= 35.4) return "Moderate";
-  else if (avg <= 55.4) return "Unhealthy_Sensitive";
-  else if (avg <= 150.4) return "Unhealthy";
-  else if (avg <= 250.4) return "Very_Unhealthy";
-  else {//avg >= 250.5
-    return "Hazardous";
-  }
+    if (avg <= PM25_GOOD) return "Good";
+    else if (avg <= PM25_MODERATE) return "Moderate";
+    else if (avg <= PM25_UNHEALTHY_SENSITIVE) return "Unhealthy_Sensitive";
+    else if (avg <= PM25_UNHEALTHY) return "Unhealthy";
+    else if (avg <= PM25_VERY_UNHEALTHY) return "Very_Unhealthy";
+    else return "Hazardous";
 }
 
 void setRGB(int rPin, int gPin, int bPin, int rVal, int gVal, int bVal) {
@@ -166,7 +174,7 @@ File openDailyPM25Log() {
   String currentDate = currentDateString();
   if (currentDate != lastDate) {
     lastDate = currentDate;
-    String filenameStr = "/pm25_" + currentDate + ".csv";
+    String filenameStr = "/Box" + String(BOX_NUMBER) + "pm25_" + currentDate + ".csv";
     char filename[32];
     filenameStr.toCharArray(filename, sizeof(filename));
     if (!SD.exists(filename)) {
@@ -181,7 +189,7 @@ File openDailyPM25Log() {
       }
     }
   }
-  String filenameStr = "/pm25_" + lastDate + ".csv";
+  String filenameStr =  "/Box" + String(BOX_NUMBER) + "pm25_" + lastDate + ".csv";
   char filename[32];
   filenameStr.toCharArray(filename, sizeof(filename));
   return SD.open(filename, FILE_WRITE);
@@ -190,7 +198,7 @@ File openDailyPM25Log() {
 // Same as above but for external SD using SdFat
 FsFile openDailyPM25ExtLog() {
   String currentDate = currentDateString();
-  String filenameStr = "/pm25_" + currentDate + ".csv";
+  String filenameStr =  "/Box" + String(BOX_NUMBER) + "pm25_" + currentDate + ".csv";
   char filename[32];
   filenameStr.toCharArray(filename, sizeof(filename));
 
