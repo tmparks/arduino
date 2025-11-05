@@ -1,5 +1,5 @@
 // Box number (incorporated into file names)
-constexpr int BOX_NUMBER = 1;
+constexpr int BOX_NUMBER = 0;
 
 // PM2.5 high breakpoints
 constexpr float PM25_GOOD = 12.0;
@@ -8,15 +8,27 @@ constexpr float PM25_UNHEALTHY_SENSITIVE = 55.4;
 constexpr float PM25_UNHEALTHY = 150.4;
 constexpr float PM25_VERY_UNHEALTHY = 250.4;
 
-#include <SPI.h>
+// PM2.5 sleep hours (24-hour format)
+// Set both to the same value to disable sleep mode
+constexpr int PM25_SLEEP_BEGIN_HOUR = 22; // 10 PM
+constexpr int PM25_SLEEP_END_HOUR = 5;    // 5 AM
+constexpr int PM25_WAKE_MINUTES = 5; // wake for a few minutes each quarter hour
+
+#include <ADC.h>
+#include <Adafruit_PM25AQI.h>
+#include <DFRobot_C4001.h>
 #include <SD.h>
+#include <SPI.h>
 #include <SdFat.h>
 #include <TimeLib.h>
-#include "Adafruit_PM25AQI.h"
-#include <ADC.h>
-#include <bsec2.h>
 #include <Wire.h>
-#include "DFRobot_C4001.h"
+#include <bsec2.h>
+
+template <typename T>
+void setZero(T& var) {
+    static_assert(std::is_trivially_copyable_v<T> == true);
+    memset(&var, 0, sizeof(T));
+}
 
 // Initialize ADC library for analog gas sensor (MiCS5524)
 ADC *adc = new ADC();
@@ -55,7 +67,11 @@ bool sdExtFull = false;
 bool triedReinit = false;
 
 // PM2.5 sensor (Adafruit PM5003 or equivalent)
-Adafruit_PM25AQI aqi = Adafruit_PM25AQI();
+constexpr auto PM25_SET_PIN_1 = 25; // sensor 1 control pin
+constexpr auto PM25_SET_PIN_2 = 24; // sensor 2 control pin
+constexpr auto PM25_SLEEP = LOW;
+constexpr auto PM25_WAKE = HIGH;
+Adafruit_PM25AQI aqi1 = Adafruit_PM25AQI();
 Adafruit_PM25AQI aqi2 = Adafruit_PM25AQI();
 
 //PM2.5 running average - Circular buffer for 1-minute (60 samples)
@@ -63,6 +79,54 @@ const int PM25_HISTORY_SIZE = 60;
 uint16_t pm25History[PM25_HISTORY_SIZE] = {0};  // Holds last 60 PM2.5 values
 int pm25Index = 0; // Points to next insert location
 int pm25Count = 0; // Actual number of samples stored (max 60)
+
+// Initialize PM2.5 sensors
+void pm25Setup() {
+    pinMode(PM25_SET_PIN_1, OUTPUT);
+    pinMode(PM25_SET_PIN_2, OUTPUT);
+    pm25SleepWake(); // set initial state
+
+    Serial2.begin(9600); // sensor 1
+    Serial5.begin(9600); // sensor 2
+    delay(3000);
+    if (!aqi1.begin_UART(&Serial2)) {
+        errLeds();
+    }
+    if (!aqi2.begin_UART(&Serial5)) {
+        errLeds();
+    }
+}
+
+// PM2.5 sensor sleep/wake control
+int pm25SleepWake() {
+    auto val = PM25_WAKE; // wake by default
+    auto currentTime = now();
+    if (minute(currentTime) % 15 < PM25_WAKE_MINUTES) {
+        // wake for a few minutes each quarter hour
+        val = PM25_WAKE;
+    }
+    else if (PM25_SLEEP_BEGIN_HOUR < PM25_SLEEP_END_HOUR) {
+        // Sleep period does not cross midnight
+        if (PM25_SLEEP_BEGIN_HOUR <= hour(currentTime)
+            && hour(currentTime) < PM25_SLEEP_END_HOUR) {
+            val = PM25_SLEEP;
+        }
+    }
+    else if (PM25_SLEEP_END_HOUR < PM25_SLEEP_BEGIN_HOUR) {
+        // Sleep period crosses midnight
+        if (PM25_SLEEP_BEGIN_HOUR <= hour(currentTime)
+            || hour(currentTime) < PM25_SLEEP_END_HOUR) {
+            val = PM25_SLEEP;
+        }
+    }
+    else {
+        // Sleep period disabled
+        val = PM25_WAKE;
+    }
+    digitalWrite(PM25_SET_PIN_1, val);
+    digitalWrite(PM25_SET_PIN_2, val);
+    return val;
+}
 
 //PM2.5 breakpoints
 String pm25Category(float avg) {
@@ -292,7 +356,7 @@ void setup() {
   radar.setDetectionRange(/*min*/30, /*max*/500, /*trig*/500); //Min 30-2000cm; Max 240-2000cm; default trig = max
   radar.setTrigSensitivity(0); //range 0-9
   radar.setKeepSensitivity(0);  //range 0-9
-  radar.setDelay(/*trig*/10, /*keep*/2); //trig 0.1s :unit 0.01s (0-2s); keep 1s :unit 0.5s (1s-1500s)
+  radar.setDelay(/*trig*/10, /*keep*/4); //trig 0.1s :unit 0.01s (0-2s); keep 2s :unit 0.5s (1s-1500s)
   radar.setPwm(/*pwm1*/100, /*pwm2*/0, /*timer*/10);
   radar.setIoPolaity(1);
 
@@ -324,19 +388,7 @@ void setup() {
     Serial.println("RTC has set the system time");
   }
 
-  // Initialize PM2.5 sensor via UART2
-  Serial2.begin(9600);
-  delay(3000);
-  if (!aqi.begin_UART(&Serial2)) {
-    errLeds();
-  }
-
-  // Initialize second PM2.5 sensor via UART2
-  Serial5.begin(9600);
-  delay(3000);
-  if (!aqi2.begin_UART(&Serial5)) {
-    errLeds();
-  }  
+  pm25Setup(); // Initialize PM2.5 sensors
 
   // Initialize BME688 via BSEC2
   bsecSensor sensorList[] = {
@@ -389,169 +441,173 @@ void loop() {
   // Every 1 second, log all sensor values
   if (millis() - intervalStartMillis >= INTEGRATION_INTERVAL_MS) {
     intervalStartMillis = millis();
-    PM25_AQI_Data data, data2;
-    if (aqi.read(&data)) {
-      //Read 2nd pm2.5 sensor
-      aqi2.read(&data2);
 
-      // Store PM2.5 reading into circular buffer
-      pm25History[pm25Index] = data.pm25_standard;
-      pm25Index = (pm25Index + 1) % PM25_HISTORY_SIZE;
-      if (pm25Count < PM25_HISTORY_SIZE) pm25Count++;
+    auto data1 = PM25_AQI_Data{};
+    auto data2 = PM25_AQI_Data{};
+    setZero(data1);
+    setZero(data2);
+    if (pm25SleepWake() == PM25_WAKE) {
+        aqi1.read(&data1);
+        aqi2.read(&data2);
+    }
 
-      // Compute 1-minute average
-      uint32_t pm25Sum = 0;
-      for (int i = 0; i < pm25Count; i++) {
-        pm25Sum += pm25History[i];
+    // Store PM2.5 reading into circular buffer
+    pm25History[pm25Index] = data1.pm25_standard;
+    pm25Index = (pm25Index + 1) % PM25_HISTORY_SIZE;
+    if (pm25Count < PM25_HISTORY_SIZE) pm25Count++;
+
+    // Compute 1-minute average
+    uint32_t pm25Sum = 0;
+    for (int i = 0; i < pm25Count; i++) {
+      pm25Sum += pm25History[i];
+    }
+    float pm25Avg = (pm25Count > 0) ? (float)pm25Sum / pm25Count : NAN;
+    String category = pm25Category(pm25Avg);
+    Serial.print("1-min PM2.5 avg: ");
+    Serial.print(pm25Avg);
+    Serial.print(" µg/m³ — Category: ");
+    Serial.println(category);
+
+    // Motion detection
+    if(radar.motionDetection()){
+      dfMotion = true;
+      Serial.println("Motion");
+    } else {
+      dfMotion = false;
+    }
+
+    // Turn off all LEDs initially
+    setRGB(LED1_R, LED1_G, LED1_B, HIGH, HIGH, HIGH);
+    setRGB(LED2_R, LED2_G, LED2_B, HIGH, HIGH, HIGH);
+    setRGB(LED3_R, LED3_G, LED3_B, HIGH, HIGH, HIGH);
+
+    // Set LEDs according to category
+    if (category == "Good") {
+      setRGB(LED1_R, LED1_G, LED1_B, HIGH, LOW, HIGH);       // Green
+    } else if (category == "Moderate") {
+      setRGB(LED1_R, LED1_G, LED1_B, LOW, LOW, HIGH);        // Yellow
+    } else if (category == "Unhealthy_Sensitive") {
+      setRGB(LED1_R, LED1_G, LED1_B, LOW, HIGH, HIGH);       // Orange (red on, green off)
+    } else if (category == "Unhealthy") {
+      setRGB(LED1_R, LED1_G, LED1_B, LOW, HIGH, HIGH);       // Red
+    } else if (category == "Very_Unhealthy") {
+      setRGB(LED1_R, LED1_G, LED1_B, LOW, HIGH, HIGH);       // Red
+      setRGB(LED2_R, LED2_G, LED2_B, LOW, HIGH, HIGH);       // Red
+    } else if (category == "Hazardous") {
+      setRGB(LED1_R, LED1_G, LED1_B, LOW, HIGH, HIGH);       // Red
+      setRGB(LED2_R, LED2_G, LED2_B, LOW, HIGH, HIGH);       // Red
+      setRGB(LED3_R, LED3_G, LED3_B, LOW, HIGH, HIGH);       // Red
+    }
+
+
+    // Log to internal SD
+    if (sdOK) {
+      myFile = openDailyPM25Log();
+      if (myFile) {
+        myFile.print(currentDateTime()); myFile.print(",");
+        myFile.print(dfMotion); myFile.print(",");
+        myFile.print(pm25Avg,2); myFile.print(",");
+        //Write 1st pm2.5 sensor data
+        myFile.print(data1.pm10_standard); myFile.print(",");
+        myFile.print(data1.pm25_standard); myFile.print(",");
+        myFile.print(data1.pm100_standard); myFile.print(",");
+        myFile.print(data1.pm10_env); myFile.print(",");
+        myFile.print(data1.pm25_env); myFile.print(",");
+        myFile.print(data1.pm100_env); myFile.print(",");
+        myFile.print(data1.particles_03um); myFile.print(",");
+        myFile.print(data1.particles_05um); myFile.print(",");
+        myFile.print(data1.particles_10um); myFile.print(",");
+        myFile.print(data1.particles_25um); myFile.print(",");
+        myFile.print(data1.particles_50um); myFile.print(",");
+        myFile.print(data1.particles_100um); myFile.print(",");
+        myFile.print(data1.aqi_pm25_us); myFile.print(",");
+        myFile.print(data1.aqi_pm100_us); myFile.print(",");
+        //Write Mics analog data
+        myFile.print(integratedVoltage, 6); myFile.print(",");
+        //Write BME688 data
+        myFile.print(bmeIaq); myFile.print(",");
+        myFile.print(bmeIaqAcc); myFile.print(",");
+        myFile.print(bmeTemp); myFile.print(",");
+        myFile.print(bmePres); myFile.print(",");
+        myFile.print(bmeHum); myFile.print(",");
+        myFile.print(bmeGas); myFile.print(",");
+        myFile.print(bmeStab); myFile.print(",");
+        myFile.print(bmeRunIn); myFile.print(",");
+        //Write 2nd pm2.5 sensor data
+        myFile.print(data2.pm10_standard); myFile.print(",");
+        myFile.print(data2.pm25_standard); myFile.print(",");
+        myFile.print(data2.pm100_standard); myFile.print(",");
+        myFile.print(data2.pm10_env); myFile.print(",");
+        myFile.print(data2.pm25_env); myFile.print(",");
+        myFile.print(data2.pm100_env); myFile.print(",");
+        myFile.print(data2.particles_03um); myFile.print(",");
+        myFile.print(data2.particles_05um); myFile.print(",");
+        myFile.print(data2.particles_10um); myFile.print(",");
+        myFile.print(data2.particles_25um); myFile.print(",");
+        myFile.print(data2.particles_50um); myFile.print(",");
+        myFile.print(data2.particles_100um); myFile.print(",");
+        myFile.print(data2.aqi_pm25_us); myFile.print(",");
+        myFile.println(data2.aqi_pm100_us); 
+        myFile.close();
+        Serial.println("Data recorded to internal SD card");
+      } else {
+        sdFull = true;
       }
-      float pm25Avg = (pm25Count > 0) ? (float)pm25Sum / pm25Count : NAN;
-      String category = pm25Category(pm25Avg);
-      Serial.print("1-min PM2.5 avg: ");
-      Serial.print(pm25Avg);
-      Serial.print(" µg/m³ — Category: ");
-      Serial.println(category);
+    }
 
-      // Motion detection
-      if(radar.motionDetection()){
-        dfMotion = true;
-        Serial.println("Motion");
-        } else {
-          dfMotion = false;
-        }
-
-      // Turn off all LEDs initially
-      setRGB(LED1_R, LED1_G, LED1_B, HIGH, HIGH, HIGH);
-      setRGB(LED2_R, LED2_G, LED2_B, HIGH, HIGH, HIGH);
-      setRGB(LED3_R, LED3_G, LED3_B, HIGH, HIGH, HIGH);
-
-      // Set LEDs according to category
-      if (category == "Good") {
-        setRGB(LED1_R, LED1_G, LED1_B, HIGH, LOW, HIGH);       // Green
-        } else if (category == "Moderate") {
-        setRGB(LED1_R, LED1_G, LED1_B, LOW, LOW, HIGH);        // Yellow
-        } else if (category == "Unhealthy_Sensitive") {
-        setRGB(LED1_R, LED1_G, LED1_B, LOW, HIGH, HIGH);       // Orange (red on, green off)
-        } else if (category == "Unhealthy") {
-        setRGB(LED1_R, LED1_G, LED1_B, LOW, HIGH, HIGH);       // Red
-        } else if (category == "Very_Unhealthy") {
-        setRGB(LED1_R, LED1_G, LED1_B, LOW, HIGH, HIGH);       // Red
-        setRGB(LED2_R, LED2_G, LED2_B, LOW, HIGH, HIGH);       // Red
-        } else if (category == "Hazardous") {
-        setRGB(LED1_R, LED1_G, LED1_B, LOW, HIGH, HIGH);       // Red
-        setRGB(LED2_R, LED2_G, LED2_B, LOW, HIGH, HIGH);       // Red
-        setRGB(LED3_R, LED3_G, LED3_B, LOW, HIGH, HIGH);       // Red
-        }
-
-
-      // Log to internal SD
-      if (sdOK) {
-        myFile = openDailyPM25Log();
-        if (myFile) {
-          myFile.print(currentDateTime()); myFile.print(",");
-          myFile.print(dfMotion); myFile.print(",");
-          myFile.print(pm25Avg,2); myFile.print(",");
-          //Write 1st pm2.5 sensor data
-          myFile.print(data.pm10_standard); myFile.print(",");
-          myFile.print(data.pm25_standard); myFile.print(",");
-          myFile.print(data.pm100_standard); myFile.print(",");
-          myFile.print(data.pm10_env); myFile.print(",");
-          myFile.print(data.pm25_env); myFile.print(",");
-          myFile.print(data.pm100_env); myFile.print(",");
-          myFile.print(data.particles_03um); myFile.print(",");
-          myFile.print(data.particles_05um); myFile.print(",");
-          myFile.print(data.particles_10um); myFile.print(",");
-          myFile.print(data.particles_25um); myFile.print(",");
-          myFile.print(data.particles_50um); myFile.print(",");
-          myFile.print(data.particles_100um); myFile.print(",");
-          myFile.print(data.aqi_pm25_us); myFile.print(",");
-          myFile.print(data.aqi_pm100_us); myFile.print(",");
-          //Write Mics analog data
-          myFile.print(integratedVoltage, 6); myFile.print(",");
-          //Write BME688 data
-          myFile.print(bmeIaq); myFile.print(",");
-          myFile.print(bmeIaqAcc); myFile.print(",");
-          myFile.print(bmeTemp); myFile.print(",");
-          myFile.print(bmePres); myFile.print(",");
-          myFile.print(bmeHum); myFile.print(",");
-          myFile.print(bmeGas); myFile.print(",");
-          myFile.print(bmeStab); myFile.print(",");
-          myFile.print(bmeRunIn); myFile.print(",");
-          //Write 2nd pm2.5 sensor data
-          myFile.print(data2.pm10_standard); myFile.print(",");
-          myFile.print(data2.pm25_standard); myFile.print(",");
-          myFile.print(data2.pm100_standard); myFile.print(",");
-          myFile.print(data2.pm10_env); myFile.print(",");
-          myFile.print(data2.pm25_env); myFile.print(",");
-          myFile.print(data2.pm100_env); myFile.print(",");
-          myFile.print(data2.particles_03um); myFile.print(",");
-          myFile.print(data2.particles_05um); myFile.print(",");
-          myFile.print(data2.particles_10um); myFile.print(",");
-          myFile.print(data2.particles_25um); myFile.print(",");
-          myFile.print(data2.particles_50um); myFile.print(",");
-          myFile.print(data2.particles_100um); myFile.print(",");
-          myFile.print(data2.aqi_pm25_us); myFile.print(",");
-          myFile.println(data2.aqi_pm100_us); 
-          myFile.close();
-          Serial.println("Data recorded to internal SD card");
-        } else {
-          sdFull = true;
-        }
-      }
-
-      // Log to external SD
-      if (sdExtOK) {
-        extFile = openDailyPM25ExtLog();
-        if (extFile) {
-          extFile.print(currentDateTime()); extFile.print(",");
-          extFile.print(dfMotion); extFile.print(",");
-          extFile.print(pm25Avg,2); extFile.print(",");
-          //Write 1st pm2.5 sensor data
-          extFile.print(data.pm10_standard); extFile.print(",");
-          extFile.print(data.pm25_standard); extFile.print(",");
-          extFile.print(data.pm100_standard); extFile.print(",");
-          extFile.print(data.pm10_env); extFile.print(",");
-          extFile.print(data.pm25_env); extFile.print(",");
-          extFile.print(data.pm100_env); extFile.print(",");
-          extFile.print(data.particles_03um); extFile.print(",");
-          extFile.print(data.particles_05um); extFile.print(",");
-          extFile.print(data.particles_10um); extFile.print(",");
-          extFile.print(data.particles_25um); extFile.print(",");
-          extFile.print(data.particles_50um); extFile.print(",");
-          extFile.print(data.particles_100um); extFile.print(",");
-          extFile.print(data.aqi_pm25_us); extFile.print(",");
-          extFile.print(data.aqi_pm100_us); extFile.print(",");
-          //Write Mics analog data
-          extFile.print(integratedVoltage, 6); extFile.print(",");
-          //Write BME688 data
-          extFile.print(bmeIaq); extFile.print(",");
-          extFile.print(bmeIaqAcc); extFile.print(",");
-          extFile.print(bmeTemp); extFile.print(",");
-          extFile.print(bmePres); extFile.print(",");
-          extFile.print(bmeHum); extFile.print(",");
-          extFile.print(bmeGas); extFile.print(",");
-          extFile.print(bmeStab); extFile.print(",");
-          extFile.print(bmeRunIn); extFile.print(",");
-          //Write 2nd pm2.5 sensor data
-          extFile.print(data2.pm10_standard); extFile.print(",");
-          extFile.print(data2.pm25_standard); extFile.print(",");
-          extFile.print(data2.pm100_standard); extFile.print(",");
-          extFile.print(data2.pm10_env); extFile.print(",");
-          extFile.print(data2.pm25_env); extFile.print(",");
-          extFile.print(data2.pm100_env); extFile.print(",");
-          extFile.print(data2.particles_03um); extFile.print(",");
-          extFile.print(data2.particles_05um); extFile.print(",");
-          extFile.print(data2.particles_10um); extFile.print(",");
-          extFile.print(data2.particles_25um); extFile.print(",");
-          extFile.print(data2.particles_50um); extFile.print(",");
-          extFile.print(data2.particles_100um); extFile.print(",");
-          extFile.print(data2.aqi_pm25_us); extFile.print(",");
-          extFile.println(data2.aqi_pm100_us);
-          extFile.close();
-          Serial.println("Data recorded to external SD card");
-        } else {
-          sdExtFull = true;
-          sdExtOK = false;
-        }
+    // Log to external SD
+    if (sdExtOK) {
+      extFile = openDailyPM25ExtLog();
+      if (extFile) {
+        extFile.print(currentDateTime()); extFile.print(",");
+        extFile.print(dfMotion); extFile.print(",");
+        extFile.print(pm25Avg,2); extFile.print(",");
+        //Write 1st pm2.5 sensor data
+        extFile.print(data1.pm10_standard); extFile.print(",");
+        extFile.print(data1.pm25_standard); extFile.print(",");
+        extFile.print(data1.pm100_standard); extFile.print(",");
+        extFile.print(data1.pm10_env); extFile.print(",");
+        extFile.print(data1.pm25_env); extFile.print(",");
+        extFile.print(data1.pm100_env); extFile.print(",");
+        extFile.print(data1.particles_03um); extFile.print(",");
+        extFile.print(data1.particles_05um); extFile.print(",");
+        extFile.print(data1.particles_10um); extFile.print(",");
+        extFile.print(data1.particles_25um); extFile.print(",");
+        extFile.print(data1.particles_50um); extFile.print(",");
+        extFile.print(data1.particles_100um); extFile.print(",");
+        extFile.print(data1.aqi_pm25_us); extFile.print(",");
+        extFile.print(data1.aqi_pm100_us); extFile.print(",");
+        //Write Mics analog data
+        extFile.print(integratedVoltage, 6); extFile.print(",");
+        //Write BME688 data
+        extFile.print(bmeIaq); extFile.print(",");
+        extFile.print(bmeIaqAcc); extFile.print(",");
+        extFile.print(bmeTemp); extFile.print(",");
+        extFile.print(bmePres); extFile.print(",");
+        extFile.print(bmeHum); extFile.print(",");
+        extFile.print(bmeGas); extFile.print(",");
+        extFile.print(bmeStab); extFile.print(",");
+        extFile.print(bmeRunIn); extFile.print(",");
+        //Write 2nd pm2.5 sensor data
+        extFile.print(data2.pm10_standard); extFile.print(",");
+        extFile.print(data2.pm25_standard); extFile.print(",");
+        extFile.print(data2.pm100_standard); extFile.print(",");
+        extFile.print(data2.pm10_env); extFile.print(",");
+        extFile.print(data2.pm25_env); extFile.print(",");
+        extFile.print(data2.pm100_env); extFile.print(",");
+        extFile.print(data2.particles_03um); extFile.print(",");
+        extFile.print(data2.particles_05um); extFile.print(",");
+        extFile.print(data2.particles_10um); extFile.print(",");
+        extFile.print(data2.particles_25um); extFile.print(",");
+        extFile.print(data2.particles_50um); extFile.print(",");
+        extFile.print(data2.particles_100um); extFile.print(",");
+        extFile.print(data2.aqi_pm25_us); extFile.print(",");
+        extFile.println(data2.aqi_pm100_us);
+        extFile.close();
+        Serial.println("Data recorded to external SD card");
+      } else {
+        sdExtFull = true;
+        sdExtOK = false;
       }
     }
     integratedVoltage = 0.0;  // Reset integration for next interval
