@@ -14,6 +14,9 @@ constexpr int PM25_SLEEP_BEGIN_HOUR = 22; // 10 PM
 constexpr int PM25_SLEEP_END_HOUR = 5;    // 5 AM
 constexpr int PM25_WAKE_MINUTES = 5; // wake for a few minutes each quarter hour
 
+// Enable or disable the motion sensor
+constexpr bool ENABLE_MOTION_SENSOR = true;
+
 #include <ADC.h>
 #include <Adafruit_PM25AQI.h>
 #include <DFRobot_C4001.h>
@@ -335,7 +338,6 @@ void checkExternalSD() {
 void setup() {
   Serial.begin(9600);
   Wire.begin();
-  radar.begin();
   pinMode(PANIC_LED, OUTPUT);
   digitalWrite(PANIC_LED, LOW);
 
@@ -347,18 +349,21 @@ void setup() {
   // Set RGB LED pins as outputs
   int rgbPins[] = {LED1_R, LED1_G, LED1_B, LED2_R, LED2_G, LED2_B, LED3_R, LED3_G, LED3_B};
   for (int i = 0; i < 9; i++) {
-  pinMode(rgbPins[i], OUTPUT);
-  digitalWrite(rgbPins[i], HIGH); // all off initially (common anode)
-}
+    pinMode(rgbPins[i], OUTPUT);
+    digitalWrite(rgbPins[i], HIGH); // all off initially (common anode)
+  }
 
-  //Initialize DFRobot Motion Sensor
-  radar.setSensorMode(eExitMode);
-  radar.setDetectionRange(/*min*/30, /*max*/500, /*trig*/500); //Min 30-2000cm; Max 240-2000cm; default trig = max
-  radar.setTrigSensitivity(0); //range 0-9
-  radar.setKeepSensitivity(0);  //range 0-9
-  radar.setDelay(/*trig*/10, /*keep*/4); //trig 0.1s :unit 0.01s (0-2s); keep 2s :unit 0.5s (1s-1500s)
-  radar.setPwm(/*pwm1*/100, /*pwm2*/0, /*timer*/10);
-  radar.setIoPolaity(1);
+  if (ENABLE_MOTION_SENSOR) {
+    //Initialize DFRobot Motion Sensor
+    radar.begin();
+    radar.setSensorMode(eExitMode);
+    radar.setDetectionRange(/*min*/30, /*max*/500, /*trig*/500); //Min 30-2000cm; Max 240-2000cm; default trig = max
+    radar.setTrigSensitivity(0); //range 0-9
+    radar.setKeepSensitivity(0);  //range 0-9
+    radar.setDelay(/*trig*/10, /*keep*/4); //trig 0.1s :unit 0.01s (0-2s); keep 2s :unit 0.5s (1s-1500s)
+    radar.setPwm(/*pwm1*/100, /*pwm2*/0, /*timer*/10);
+    radar.setIoPolaity(1);
+  }
 
   // Initialize internal SD
   Serial.println("Initializing SD card...");
@@ -469,7 +474,7 @@ void loop() {
     Serial.println(category);
 
     // Motion detection
-    if(radar.motionDetection()){
+    if(ENABLE_MOTION_SENSOR && radar.motionDetection()){
       dfMotion = true;
       Serial.println("Motion");
     } else {

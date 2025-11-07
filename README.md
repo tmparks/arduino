@@ -1,6 +1,6 @@
 # arduino
 
-0.  Delete (or rename) the following directories (if they exist) to remove
+1.  Delete (or rename) the following directories (if they exist) to remove
     any outdated components of the development environment
     * Windows Command Prompt:
       ```
@@ -18,7 +18,7 @@
       rm --recursive --force ~/Arduino
       ```
 
-1.  Download and install [arduino-cli](https://docs.arduino.cc/arduino-cli/installation/#download)
+2.  Download and install [arduino-cli](https://docs.arduino.cc/arduino-cli/installation/#download)
     (downloads less than 20 MB)
     * Windows: download and launch msi installer
     * macOS or Linux: download and extract files from archive
@@ -28,10 +28,10 @@
       sudo mv arduino-cli /usr/local/bin
       ```
 
-2.  Download and extract [code](https://github.com/tmparks/arduino/archive/refs/heads/main.zip)
+3.  Download and extract [code](https://github.com/tmparks/arduino/archive/refs/heads/main.zip)
     (downloads less than 1 MB)
 
-3.  Setup development environment
+4.  Setup development environment
     (downloads less than 150 MB)
     * Replace `<dir>` below with the directory containing the extracted files
       from the previous step
@@ -46,17 +46,25 @@
       ./setup.sh
       ```
 
-4.  Compile
+5.  Edit AirQuality.ino to modify `BOX_NUMBER` and other configuration parameters.
+
+6.  Compile
     (downloads less than 1 MB, first time only)
     * Replace `<sketch>` below with the name of the sketch (e.g. AirQuality or Blink)
     ```
     arduino-cli compile <sketch>
     ```
 
-5.  Upload
+7.  Upload
     * Replace `<port>` below with the port shown for the `teensy:avr:teensy41` board
     * Replace `<sketch>` below with the name of the sketch (e.g. AirQuality or Blink)
     ```
     arduino-cli board list
     arduino-cli upload --port <port> <sketch>
+    ```
+
+8.  Monitor
+    * Replace `<port>` below with the port for the `teensy:avr:teensy41` board
+    ```
+    arduino-cli monitor --port <port>
     ```
