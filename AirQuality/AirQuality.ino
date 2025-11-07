@@ -1,3 +1,26 @@
+// Box number (incorporated into file names)
+constexpr int BOX_NUMBER = 0;
+
+// PM2.5 high breakpoints
+constexpr float PM25_GOOD = 12.0;
+constexpr float PM25_MODERATE = 35.4;
+constexpr float PM25_UNHEALTHY_SENSITIVE = 55.4;
+constexpr float PM25_UNHEALTHY = 150.4;
+constexpr float PM25_VERY_UNHEALTHY = 250.4;
+
+// PM2.5 sleep hours (24-hour format)
+// Set both to the same value to disable sleep mode
+constexpr int PM25_SLEEP_BEGIN_HOUR = 22; // 10 PM
+constexpr int PM25_SLEEP_END_HOUR = 5;    // 5 AM
+constexpr int PM25_WAKE_MINUTES = 5; // wake for a few minutes each quarter hour
+
+// Enable or disable the motion sensor
+constexpr bool ENABLE_MOTION_SENSOR = true;
+
+#include <ADC.h>
+#include <Adafruit_PM25AQI.h>
+#include <DFRobot_C4001.h>
+#include <SD.h>
 // https://docs.arduino.cc/learn/electronics/low-power/
 // https://www.pjrc.com/teensy/low_power.html
 constexpr auto lowPower = true; // Use power-saving measures.
@@ -17,20 +40,10 @@ constexpr auto lowPower = true; // Use power-saving measures.
 #include <Wire.h>
 #include <bsec2.h>
 
-// Re-enable warnings that were supressed for Adafruit library.
-// Affects all .ino files in the sketch folder.
-// See compiler.cpp.extra_flags in platform.txt.
-// https://docs.arduino.cc/arduino-cli/sketch-build-process/#pre-processing
-#pragma GCC diagnostic error "-Wsign-compare"
-#pragma GCC diagnostic error "-Wunused-variable"
-
-void sleep(int mode) {
-    set_sleep_mode(mode);
-    noInterrupts();
-    sleep_enable();
-    interrupts();
-    sleep_cpu();
-    sleep_disable();
+template <typename T>
+void setZero(T& var) {
+    static_assert(std::is_trivially_copyable_v<T> == true);
+    memset(&var, 0, sizeof(T));
 }
 
 // Initialize ADC library for analog gas sensor (MiCS5524)
@@ -67,7 +80,11 @@ bool externalOK = false;
 bool externalFull = false;
 
 // PM2.5 sensor (Adafruit PM5003 or equivalent)
-Adafruit_PM25AQI aqi = Adafruit_PM25AQI();
+constexpr auto PM25_SET_PIN_1 = 25; // sensor 1 control pin
+constexpr auto PM25_SET_PIN_2 = 24; // sensor 2 control pin
+constexpr auto PM25_SLEEP = LOW;
+constexpr auto PM25_WAKE = HIGH;
+Adafruit_PM25AQI aqi1 = Adafruit_PM25AQI();
 Adafruit_PM25AQI aqi2 = Adafruit_PM25AQI();
 
 //PM2.5 running average - Circular buffer for 1-minute (60 samples)
@@ -76,21 +93,62 @@ uint16_t pm25History[PM25_HISTORY_SIZE] = {0}; // Holds last 60 PM2.5 values
 int pm25Index = 0;                             // Points to next insert location
 int pm25Count = 0; // Actual number of samples stored (max 60)
 
+// Initialize PM2.5 sensors
+void pm25Setup() {
+    pinMode(PM25_SET_PIN_1, OUTPUT);
+    pinMode(PM25_SET_PIN_2, OUTPUT);
+    pm25SleepWake(); // set initial state
+
+    Serial2.begin(9600); // sensor 1
+    Serial5.begin(9600); // sensor 2
+    delay(3000);
+    if (!aqi1.begin_UART(&Serial2)) {
+        errLeds();
+    }
+    if (!aqi2.begin_UART(&Serial5)) {
+        errLeds();
+    }
+}
+
+// PM2.5 sensor sleep/wake control
+int pm25SleepWake() {
+    auto val = PM25_WAKE; // wake by default
+    auto currentTime = now();
+    if (minute(currentTime) % 15 < PM25_WAKE_MINUTES) {
+        // wake for a few minutes each quarter hour
+        val = PM25_WAKE;
+    }
+    else if (PM25_SLEEP_BEGIN_HOUR < PM25_SLEEP_END_HOUR) {
+        // Sleep period does not cross midnight
+        if (PM25_SLEEP_BEGIN_HOUR <= hour(currentTime)
+            && hour(currentTime) < PM25_SLEEP_END_HOUR) {
+            val = PM25_SLEEP;
+        }
+    }
+    else if (PM25_SLEEP_END_HOUR < PM25_SLEEP_BEGIN_HOUR) {
+        // Sleep period crosses midnight
+        if (PM25_SLEEP_BEGIN_HOUR <= hour(currentTime)
+            || hour(currentTime) < PM25_SLEEP_END_HOUR) {
+            val = PM25_SLEEP;
+        }
+    }
+    else {
+        // Sleep period disabled
+        val = PM25_WAKE;
+    }
+    digitalWrite(PM25_SET_PIN_1, val);
+    digitalWrite(PM25_SET_PIN_2, val);
+    return val;
+}
+
 //PM2.5 breakpoints
 String pm25Category(float avg) {
-    if (avg <= 12.0)
-        return "Good";
-    else if (avg <= 35.4)
-        return "Moderate";
-    else if (avg <= 55.4)
-        return "Unhealthy_Sensitive";
-    else if (avg <= 150.4)
-        return "Unhealthy";
-    else if (avg <= 250.4)
-        return "Very_Unhealthy";
-    else { //avg >= 250.5
-        return "Hazardous";
-    }
+    if (avg <= PM25_GOOD) return "Good";
+    else if (avg <= PM25_MODERATE) return "Moderate";
+    else if (avg <= PM25_UNHEALTHY_SENSITIVE) return "Unhealthy_Sensitive";
+    else if (avg <= PM25_UNHEALTHY) return "Unhealthy";
+    else if (avg <= PM25_VERY_UNHEALTHY) return "Very_Unhealthy";
+    else return "Hazardous";
 }
 
 void setRGB(int rPin, int gPin, int bPin, int rVal, int gVal, int bVal) {
@@ -215,7 +273,7 @@ File openDailyPM25Log() {
     String currentDate = currentDateString();
     if (currentDate != lastDate) {
         lastDate = currentDate;
-        String filenameStr = "/pm25_" + currentDate + ".csv";
+        String filenameStr = "/Box" + String(BOX_NUMBER) + "pm25_" + currentDate + ".csv";
         char filename[32];
         filenameStr.toCharArray(filename, sizeof(filename));
         if (! SD.exists(filename)) {
@@ -226,7 +284,7 @@ File openDailyPM25Log() {
             }
         }
     }
-    String filenameStr = "/pm25_" + lastDate + ".csv";
+    String filenameStr =  "/Box" + String(BOX_NUMBER) + "pm25_" + lastDate + ".csv";
     char filename[32];
     filenameStr.toCharArray(filename, sizeof(filename));
     return SD.open(filename, FILE_WRITE);
@@ -235,7 +293,7 @@ File openDailyPM25Log() {
 // Same as above but for external SD using SdFat
 FsFile openDailyPM25ExtLog() {
     String currentDate = currentDateString();
-    String filenameStr = "/pm25_" + currentDate + ".csv";
+    String filenameStr =  "/Box" + String(BOX_NUMBER) + "pm25_" + currentDate + ".csv";
     char filename[32];
     filenameStr.toCharArray(filename, sizeof(filename));
 
@@ -307,20 +365,10 @@ void checkExternalSD() {
 
 // https://www.pjrc.com/teensy/low_power.html
 void setup() {
-    if (lowPower) {
-        // Save power by seting *all* pins to OUTPUT.
-        // INPUT pins must be set later.
-        // Unused pins will remain in OUTPUT mode.
-        for (auto pin = 0; pin < NUM_DIGITAL_PINS; pin++) {
-            pinMode(pin, OUTPUT);
-        }
-    }
-
-    Serial.begin(9600);
-    Wire.begin();
-    radar.begin();
-    pinMode(PANIC_LED, OUTPUT);
-    digitalWrite(PANIC_LED, LOW);
+  Serial.begin(9600);
+  Wire.begin();
+  pinMode(PANIC_LED, OUTPUT);
+  digitalWrite(PANIC_LED, LOW);
 
     // Configure ADC for gas sensor input
     adc->adc0->setAveraging(32);  // Better noise performance
@@ -331,22 +379,21 @@ void setup() {
     int rgbPins[] = {
             LED1_R, LED1_G, LED1_B, LED2_R, LED2_G, LED2_B, LED3_R, LED3_G, LED3_B};
     for (int i = 0; i < 9; i++) {
-        pinMode(rgbPins[i], OUTPUT);
-        digitalWrite(rgbPins[i], HIGH); // all off initially (common anode)
-    }
+          pinMode(rgbPins[i], OUTPUT);
+          digitalWrite(rgbPins[i], HIGH); // all off initially (common anode)
+      }
 
+  if (ENABLE_MOTION_SENSOR) {
     //Initialize DFRobot Motion Sensor
+    radar.begin();
     radar.setSensorMode(eExitMode);
-    radar.setDetectionRange(
-            /*min*/ 30,
-            /*max*/ 500,
-            /*trig*/ 500); //Min 30-2000cm; Max 240-2000cm; default trig = max
+    radar.setDetectionRange(/*min*/30, /*max*/500, /*trig*/500); //Min 30-2000cm; Max 240-2000cm; default trig = max
     radar.setTrigSensitivity(0); //range 0-9
-    radar.setKeepSensitivity(0); //range 0-9
-    radar.setDelay(/*trig*/ 10,
-                   /*keep*/ 2); //trig 0.1s :unit 0.01s (0-2s); keep 1s :unit 0.5s (1s-1500s)
-    radar.setPwm(/*pwm1*/ 100, /*pwm2*/ 0, /*timer*/ 10);
+    radar.setKeepSensitivity(0);  //range 0-9
+    radar.setDelay(/*trig*/10, /*keep*/4); //trig 0.1s :unit 0.01s (0-2s); keep 2s :unit 0.5s (1s-1500s)
+    radar.setPwm(/*pwm1*/100, /*pwm2*/0, /*timer*/10);
     radar.setIoPolaity(1);
+  }
 
     // Initialize internal SD
     Serial.println("Initializing SD card...");
@@ -380,19 +427,7 @@ void setup() {
         Serial.println("RTC has set the system time");
     }
 
-    // Initialize PM2.5 sensor via UART2
-    Serial2.begin(9600);
-    delay(3000);
-    if (! aqi.begin_UART(&Serial2)) {
-        errLeds();
-    }
-
-    // Initialize second PM2.5 sensor via UART2
-    Serial5.begin(9600);
-    delay(3000);
-    if (! aqi2.begin_UART(&Serial5)) {
-        errLeds();
-    }
+  pm25Setup(); // Initialize PM2.5 sensors
 
     // Initialize BME688 via BSEC2
     bsecSensor sensorList[] = {
@@ -449,68 +484,67 @@ void loop() {
     float voltage = (raw * ADC_REF_VOLTAGE) / (ADC_RESOLUTION - 1);
     integratedVoltage += voltage * dt;
 
-    // Every 1 second, log all sensor values
-    if (millis() - intervalStartMillis >= INTEGRATION_INTERVAL_MS) {
-        intervalStartMillis = millis();
-        PM25_AQI_Data data, data2;
-        if (aqi.read(&data)) {
-            //Read 2nd pm2.5 sensor
-            aqi2.read(&data2);
+  // Every 1 second, log all sensor values
+  if (millis() - intervalStartMillis >= INTEGRATION_INTERVAL_MS) {
+    intervalStartMillis = millis();
 
-            // Store PM2.5 reading into circular buffer
-            pm25History[pm25Index] = data.pm25_standard;
-            pm25Index = (pm25Index + 1) % PM25_HISTORY_SIZE;
-            if (pm25Count < PM25_HISTORY_SIZE)
-                pm25Count++;
+    auto data1 = PM25_AQI_Data{};
+    auto data2 = PM25_AQI_Data{};
+    setZero(data1);
+    setZero(data2);
+    if (pm25SleepWake() == PM25_WAKE) {
+        aqi1.read(&data1);
+        aqi2.read(&data2);
+    }
 
-            // Compute 1-minute average
-            uint32_t pm25Sum = 0;
-            for (int i = 0; i < pm25Count; i++) {
-                pm25Sum += pm25History[i];
-            }
-            float pm25Avg = (pm25Count > 0) ? (float)pm25Sum / pm25Count : NAN;
-            String category = pm25Category(pm25Avg);
-            Serial.print("1-min PM2.5 avg: ");
-            Serial.print(pm25Avg);
-            Serial.print(" µg/m³ — Category: ");
-            Serial.println(category);
+    // Store PM2.5 reading into circular buffer
+    pm25History[pm25Index] = data1.pm25_standard;
+    pm25Index = (pm25Index + 1) % PM25_HISTORY_SIZE;
+    if (pm25Count < PM25_HISTORY_SIZE) pm25Count++;
 
-            // Motion detection
-            if (radar.motionDetection()) {
-                dfMotion = true;
-                Serial.println("Motion");
-            }
-            else {
-                dfMotion = false;
-            }
+    // Compute 1-minute average
+    uint32_t pm25Sum = 0;
+    for (int i = 0; i < pm25Count; i++) {
+      pm25Sum += pm25History[i];
+    }
+    float pm25Avg = (pm25Count > 0) ? (float)pm25Sum / pm25Count : NAN;
+    String category = pm25Category(pm25Avg);
+    Serial.print("1-min PM2.5 avg: ");
+    Serial.print(pm25Avg);
+    Serial.print(" µg/m³ — Category: ");
+    Serial.println(category);
 
-            // Turn off all LEDs initially
-            setRGB(LED1_R, LED1_G, LED1_B, HIGH, HIGH, HIGH);
-            setRGB(LED2_R, LED2_G, LED2_B, HIGH, HIGH, HIGH);
-            setRGB(LED3_R, LED3_G, LED3_B, HIGH, HIGH, HIGH);
+    // Motion detection
+    if(ENABLE_MOTION_SENSOR && radar.motionDetection()){
+      dfMotion = true;
+      Serial.println("Motion");
+    } else {
+      dfMotion = false;
+    }
 
-            // Set LEDs according to category
-            if (category == "Good") {
-                setRGB(LED1_R, LED1_G, LED1_B, HIGH, LOW, HIGH); // Green
-            }
-            else if (category == "Moderate") {
-                setRGB(LED1_R, LED1_G, LED1_B, LOW, LOW, HIGH); // Yellow
-            }
-            else if (category == "Unhealthy_Sensitive") {
-                setRGB(LED1_R, LED1_G, LED1_B, LOW, HIGH, HIGH); // Orange (red on, green off)
-            }
-            else if (category == "Unhealthy") {
-                setRGB(LED1_R, LED1_G, LED1_B, LOW, HIGH, HIGH); // Red
-            }
-            else if (category == "Very_Unhealthy") {
-                setRGB(LED1_R, LED1_G, LED1_B, LOW, HIGH, HIGH); // Red
-                setRGB(LED2_R, LED2_G, LED2_B, LOW, HIGH, HIGH); // Red
-            }
-            else if (category == "Hazardous") {
-                setRGB(LED1_R, LED1_G, LED1_B, LOW, HIGH, HIGH); // Red
-                setRGB(LED2_R, LED2_G, LED2_B, LOW, HIGH, HIGH); // Red
-                setRGB(LED3_R, LED3_G, LED3_B, LOW, HIGH, HIGH); // Red
-            }
+    // Turn off all LEDs initially
+    setRGB(LED1_R, LED1_G, LED1_B, HIGH, HIGH, HIGH);
+    setRGB(LED2_R, LED2_G, LED2_B, HIGH, HIGH, HIGH);
+    setRGB(LED3_R, LED3_G, LED3_B, HIGH, HIGH, HIGH);
+
+    // Set LEDs according to category
+    if (category == "Good") {
+      setRGB(LED1_R, LED1_G, LED1_B, HIGH, LOW, HIGH);       // Green
+    } else if (category == "Moderate") {
+      setRGB(LED1_R, LED1_G, LED1_B, LOW, LOW, HIGH);        // Yellow
+    } else if (category == "Unhealthy_Sensitive") {
+      setRGB(LED1_R, LED1_G, LED1_B, LOW, HIGH, HIGH);       // Orange (red on, green off)
+    } else if (category == "Unhealthy") {
+      setRGB(LED1_R, LED1_G, LED1_B, LOW, HIGH, HIGH);       // Red
+    } else if (category == "Very_Unhealthy") {
+      setRGB(LED1_R, LED1_G, LED1_B, LOW, HIGH, HIGH);       // Red
+      setRGB(LED2_R, LED2_G, LED2_B, LOW, HIGH, HIGH);       // Red
+    } else if (category == "Hazardous") {
+      setRGB(LED1_R, LED1_G, LED1_B, LOW, HIGH, HIGH);       // Red
+      setRGB(LED2_R, LED2_G, LED2_B, LOW, HIGH, HIGH);       // Red
+      setRGB(LED3_R, LED3_G, LED3_B, LOW, HIGH, HIGH);       // Red
+    }
+
 
             // Log to internal SD
             if (internalOK) {

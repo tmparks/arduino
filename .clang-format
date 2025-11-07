@@ -24,7 +24,6 @@ PenaltyExcessCharacter: 10
 PenaltyReturnTypeOnItsOwnLine: 200
 PointerAlignment: Left
 ReflowComments: false
-SpaceAfterLogicalNot: true
 SpaceInEmptyBlock: true
 Standard: c++17
 ...
