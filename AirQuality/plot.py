@@ -63,22 +63,22 @@ def read_files(directory, box_files, epam_files, resample_interval):
 if __name__ == '__main__':
 
     # Directory containing data files.
-    DIRECTORY = os.environ['HOME'] + '/Downloads/'
+    DIRECTORY = os.path.expanduser('~/Downloads/')
 
     # Name(s) of Teensy box file(s). May be empty.
     BOX_FILES = [
         'Box1pm25_2025-10-11.csv']
-    
+
     # Name(s) of EPAM sensor file(s). May be empty.
     EPAM_FILES = [
         'Epam_2025-10-11.csv']
-    
+
     # Names of data columns to plot.
     COLUMNS = [
         'PM2.5_1MinAvg',
         'PM2.5_env',
         'PM2.5_epam']
-    
+
     # X-axis label.
     XLABEL = 'Month-Day Hour'
 
