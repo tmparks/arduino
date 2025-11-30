@@ -29,7 +29,7 @@ def read_box_file(file):
     return df
 
 
-def read_epam_file(file, tz_offset=-28):
+def read_epam_file(file, tz_offset=0):
     """
     Read file from EPAM sensor. Optionally adjust the timezone.
     """
@@ -61,16 +61,28 @@ def read_files(directory, box_files, epam_files, resample_interval):
 
 
 if __name__ == '__main__':
+
+    # Directory containing data files.
     DIRECTORY = os.environ['HOME'] + '/Downloads/'
+
+    # Name(s) of Teensy box file(s). May be empty.
     BOX_FILES = [
         'Box1pm25_2025-10-11.csv']
+    
+    # Name(s) of EPAM sensor file(s). May be empty.
     EPAM_FILES = [
         'Epam_2025-10-11.csv']
+    
+    # Names of data columns to plot.
     COLUMNS = [
         'PM2.5_1MinAvg',
         'PM2.5_env',
         'PM2.5_epam']
+    
+    # X-axis label.
     XLABEL = 'Month-Day Hour'
+
+    # Y-axis label.
     YLABEL = 'PM Concentration (µg/m³)'
 
     df = read_files(DIRECTORY, BOX_FILES, EPAM_FILES, '5min')
