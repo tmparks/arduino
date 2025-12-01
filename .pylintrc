@@ -1,4 +1,3 @@
 disable=
     invalid-name,
-    redefined-outer-name,
-    unexpected-keyword-arg
+    redefined-outer-name
