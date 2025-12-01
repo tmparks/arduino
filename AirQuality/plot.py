@@ -16,7 +16,8 @@ def to_datetime_ignore_warnings(data):
     """
     Suppress warnings when converting datetime data.
     """
-    with warnings.catch_warnings(action='ignore', category=UserWarning):
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore', category=UserWarning)
         return pd.to_datetime(data)
 
 
