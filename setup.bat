@@ -11,7 +11,11 @@ set HERE=%~dp0
 set TEENSY_VERSION=1.59.0
 set BSEC2_VERSION=1.6.2400
 
+rem Exit if arduino-cli command is not found.
+arduino-cli version || exit /b 1
+
 arduino-cli config init --overwrite
+arduino-cli config set network.connection_timeout 60m0s
 arduino-cli config set library.enable_unsafe_install true 
 arduino-cli lib install --git-url https://github.com/MarkusLange/Bosch-BSEC2-Library.git
 arduino-cli config set library.enable_unsafe_install false
