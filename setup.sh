@@ -11,6 +11,9 @@ HERE="$(realpath $(dirname "$0"))" # location of this script
 TEENSY_VERSION=1.59.0
 BSEC2_VERSION=1.6.2400
 
+# Exit if arduino-cli command is not found.
+arduino-cli version || exit 1
+
 if [ $(uname -s) = Darwin ] # macOS
 then
     SED="sed -i .orig"
@@ -20,6 +23,7 @@ else # Linux
 fi
 
 arduino-cli config init --overwrite
+arduino-cli config set network.connection_timeout 60m0s
 arduino-cli config set library.enable_unsafe_install true 
 arduino-cli lib install --git-url https://github.com/MarkusLange/Bosch-BSEC2-Library.git
 arduino-cli config set library.enable_unsafe_install false

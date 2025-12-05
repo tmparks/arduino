@@ -4,8 +4,8 @@
     any outdated components of the development environment
     * Windows Command Prompt:
       ```
-      rmdir /s %LOCALAPPDATA%\Arduino15
-      rmdir /s %USERPROFILE%\Documents\Arduino
+      rmdir /s /q %LOCALAPPDATA%\Arduino15
+      rmdir /s /q %USERPROFILE%\Documents\Arduino
       ```
     * macOS terminal:
       ```
@@ -20,7 +20,7 @@
 
 2.  Download and install [arduino-cli](https://docs.arduino.cc/arduino-cli/installation/#download)
     (downloads less than 20 MB)
-    * Windows: download and launch msi installer
+    * Windows: download and launch msi installer, then restart your computer
     * macOS or Linux: download and extract files from archive
       * Replace `<dir>` below with the directory containing the extracted files
       ```
@@ -30,6 +30,7 @@
 
 3.  Download and extract [code](https://github.com/tmparks/arduino/archive/refs/heads/main.zip)
     (downloads less than 1 MB)
+    * Move the resulting directory to a convenient location
 
 4.  Setup development environment
     (downloads less than 150 MB)
