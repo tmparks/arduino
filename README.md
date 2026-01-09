@@ -69,3 +69,20 @@
     ```
     arduino-cli monitor --port <port>
     ```
+
+## Plot Air Quality Data
+
+1.  Download and install [python](https://www.python.org/downloads/).
+
+2.  Install libraries.
+    ```
+    pip install matplotlib
+    pip install pandas
+    ```
+
+3.  Edit plot.py to modify `BOX_FILES`, `EPAM_FILES`, and other configuration parameters.
+
+4.  Plot data.
+    ```
+    python3 AirQuality/plot.py
+    ```
