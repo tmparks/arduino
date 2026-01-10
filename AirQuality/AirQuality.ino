@@ -14,8 +14,10 @@ constexpr int PM25_SLEEP_BEGIN_HOUR = 22; // 10 PM
 constexpr int PM25_SLEEP_END_HOUR = 5;    // 5 AM
 constexpr int PM25_WAKE_MINUTES = 5; // wake for a few minutes each quarter hour
 
-// Enable or disable the motion sensor
-constexpr bool ENABLE_MOTION_SENSOR = true;
+// Note: some sensors must be ignored if they are not attached,
+// otherwise the program will not run.
+constexpr bool IGNORE_MOTION_SENSOR = false;
+constexpr bool IGNORE_BME688_SENSOR = false;
 #include <ADC.h>
 #include <Adafruit_PM25AQI.h>
 #include <Arduino.h>
@@ -97,6 +99,7 @@ int pm25Count = 0; // Actual number of samples stored (max 60)
 
 // Initialize PM2.5 sensors
 void pm25Setup() {
+    Serial.println("Initializing PM2.5 sensors...");
     pinMode(PM25_SET_PIN_1, OUTPUT);
     pinMode(PM25_SET_PIN_2, OUTPUT);
     pm25SleepWake(); // set initial state
@@ -374,54 +377,67 @@ void checkExternalSD() {
     }
 }
 
+void printConfiguration() {
+  Serial.print("BOX_NUMBER = "); Serial.println(BOX_NUMBER);
+  Serial.print("PM25_GOOD = "); Serial.println(PM25_GOOD);
+  Serial.print("PM25_MODERATE = "); Serial.println(PM25_MODERATE);
+  Serial.print("PM25_UNHEALTHY_SENSITIVE = "); Serial.println(PM25_UNHEALTHY_SENSITIVE);
+  Serial.print("PM25_UNHEALTHY = "); Serial.println(PM25_UNHEALTHY);
+  Serial.print("PM25_VERY_UNHEALTHY = "); Serial.println(PM25_VERY_UNHEALTHY);
+  Serial.print("PM25_SLEEP_BEGIN_HOUR = "); Serial.println(PM25_SLEEP_BEGIN_HOUR);
+  Serial.print("PM25_SLEEP_END_HOUR = "); Serial.println(PM25_SLEEP_END_HOUR);
+  Serial.print("PM25_WAKE_MINUTES = "); Serial.println(PM25_WAKE_MINUTES);
+  Serial.print("IGNORE_MOTION_SENSOR = "); Serial.println(IGNORE_MOTION_SENSOR ? "true" : "false");
+  Serial.print("IGNORE_BME688_SENSOR = "); Serial.println(IGNORE_BME688_SENSOR ? "true" : "false");
+}
+
 void setup() {
-    Serial.begin(9600);
-    Wire.begin();
-    pinMode(PANIC_LED, OUTPUT);
-    digitalWrite(PANIC_LED, LOW);
+  pinMode(PANIC_LED, OUTPUT);
+  digitalWrite(PANIC_LED, HIGH); // on during setup
+  Serial.begin(9600);
+  Serial.println("setup: BEGIN");
+  printConfiguration();
+  Wire.begin();
 
-    // Configure ADC for gas sensor input
-    adc->adc0->setAveraging(32);  // Better noise performance
-    adc->adc0->setResolution(10); // 10-bit resolution
-    pinMode(ANALOG_PIN, INPUT);
+  // Configure ADC for gas sensor input
+  Serial.println("Configuring gas sensor...");
+  adc->adc0->setAveraging(32);   // Better noise performance
+  adc->adc0->setResolution(10);  // 10-bit resolution
+  pinMode(ANALOG_PIN, INPUT);
 
-    // Set RGB LED pins as outputs
-    int rgbPins[] = {
-            LED1_R, LED1_G, LED1_B, LED2_R, LED2_G, LED2_B, LED3_R, LED3_G, LED3_B};
-    for (int i = 0; i < 9; i++) {
-        pinMode(rgbPins[i], OUTPUT);
-        digitalWrite(rgbPins[i], HIGH); // all off initially (common anode)
-    }
+  // Set RGB LED pins as outputs
+  Serial.println("Configuring LEDs...");
+  int rgbPins[] = {LED1_R, LED1_G, LED1_B, LED2_R, LED2_G, LED2_B, LED3_R, LED3_G, LED3_B};
+  for (int i = 0; i < 9; i++) {
+    pinMode(rgbPins[i], OUTPUT);
+    digitalWrite(rgbPins[i], HIGH); // all off initially (common anode)
+  }
 
-    if (ENABLE_MOTION_SENSOR) {
-        //Initialize DFRobot Motion Sensor
+  if (IGNORE_MOTION_SENSOR) {
+    Serial.println("Ignoring motion sensor.");
+  }
+  else {
+    //Initialize DFRobot Motion Sensor
+    Serial.println("Initializing motion sensor...");
+    radar.begin();
+    radar.setSensorMode(eExitMode);
+    radar.setDetectionRange(/*min*/30, /*max*/500, /*trig*/500); //Min 30-2000cm; Max 240-2000cm; default trig = max
+    radar.setTrigSensitivity(0); //range 0-9
+    radar.setKeepSensitivity(0);  //range 0-9
+    radar.setDelay(/*trig*/10, /*keep*/4); //trig 0.1s :unit 0.01s (0-2s); keep 2s :unit 0.5s (1s-1500s)
+    radar.setPwm(/*pwm1*/100, /*pwm2*/0, /*timer*/10);
+    radar.setIoPolaity(1);
+  }
 
-        radar.begin();
-        radar.setSensorMode(eExitMode);
-
-        //Min 30-2000cm; Max 240-2000cm; default trig = max
-        radar.setDetectionRange(/*min*/ 30, /*max*/ 500, /*trig*/ 500);
-
-        radar.setTrigSensitivity(0); //range 0-9
-        radar.setKeepSensitivity(0); //range 0-9
-
-        //trig 0.1s :unit 0.01s (0-2s); keep 2s :unit 0.5s (1s-1500s)
-        radar.setDelay(/*trig*/ 10, /*keep*/ 4);
-
-        radar.setPwm(/*pwm1*/ 100, /*pwm2*/ 0, /*timer*/ 10);
-        radar.setIoPolaity(1);
-    }
-
-    // Initialize internal SD
-    Serial.println("Initializing SD card...");
-    internalOK = SD.begin(BUILTIN_SDCARD);
-    if (!internalOK) {
-        Serial.println("SD card initialization failed!");
-        internalFull = true;
-    }
-    else {
-        Serial.println("SD card initialization done.");
-    }
+  // Initialize internal SD
+  Serial.println("Initializing internal SD card...");
+  sdOK = SD.begin(BUILTIN_SDCARD);
+  if (!sdOK) {
+    Serial.println("Internal SD card initialization failed!");
+    sdFull = true;
+  } else {
+    Serial.println("Internal SD card initialization done.");
+  }
 
     // Initialize external SD
     Serial.println("Initializing external SD card...");
@@ -446,24 +462,29 @@ void setup() {
 
     pm25Setup(); // Initialize PM2.5 sensors
 
+  if (IGNORE_BME688_SENSOR) {
+    Serial.println("Ignoring BME688 sensor.");
+  }
+  else {
     // Initialize BME688 via BSEC2
+    Serial.println("Initializing BME688 sensor...");
     bsecSensor sensorList[] = {
-            BSEC_OUTPUT_IAQ,
-            BSEC_OUTPUT_RAW_TEMPERATURE,
-            BSEC_OUTPUT_RAW_PRESSURE,
-            BSEC_OUTPUT_RAW_HUMIDITY,
-            BSEC_OUTPUT_RAW_GAS,
-            BSEC_OUTPUT_STABILIZATION_STATUS,
-            BSEC_OUTPUT_RUN_IN_STATUS};
-    if (!envSensor.begin(BME68X_I2C_ADDR_LOW, Wire))
-        checkBsecStatus(envSensor);
-    if (!envSensor.updateSubscription(
-                sensorList, ARRAY_LEN(sensorList), BSEC_SAMPLE_RATE_LP))
-        checkBsecStatus(envSensor);
+      BSEC_OUTPUT_IAQ,
+      BSEC_OUTPUT_RAW_TEMPERATURE,
+      BSEC_OUTPUT_RAW_PRESSURE,
+      BSEC_OUTPUT_RAW_HUMIDITY,
+      BSEC_OUTPUT_RAW_GAS,
+      BSEC_OUTPUT_STABILIZATION_STATUS,
+      BSEC_OUTPUT_RUN_IN_STATUS
+    };
+    if (!envSensor.begin(BME68X_I2C_ADDR_LOW, Wire)) checkBsecStatus(envSensor);
+    if (!envSensor.updateSubscription(sensorList, ARRAY_LEN(sensorList), BSEC_SAMPLE_RATE_LP)) checkBsecStatus(envSensor);
     envSensor.attachCallback(newDataCallback);
-
-    intervalStartMillis = millis();
-    previousMicros = micros();
+  }
+  intervalStartMillis = millis();
+  previousMicros = micros();
+  Serial.println("setup: END");
+  digitalWrite(PANIC_LED, LOW); // off after setup
 }
 
 void loop() {
@@ -477,9 +498,10 @@ void loop() {
         }
     }
 
+  if (!IGNORE_BME688_SENSOR) {
     // Run BME688 sensor reading (non-blocking)
-    if (!envSensor.run())
-        checkBsecStatus(envSensor);
+    if (!envSensor.run()) checkBsecStatus(envSensor);
+  }
 
     // Retry external SD if failed previously
     if (internalFull || (!externalOK && externalFull)) {
@@ -528,7 +550,7 @@ void loop() {
         Serial.println(category);
 
         // Motion detection
-        if (ENABLE_MOTION_SENSOR && radar.motionDetection()) {
+        if (!IGNORE_MOTION_SENSOR && radar.motionDetection()) {
             dfMotion = true;
             Serial.println("Motion");
         }
@@ -541,28 +563,29 @@ void loop() {
         setRGB(LED2_R, LED2_G, LED2_B, HIGH, HIGH, HIGH);
         setRGB(LED3_R, LED3_G, LED3_B, HIGH, HIGH, HIGH);
 
-        // Set LEDs according to category
-        if (category == "Good") {
-            setRGB(LED1_R, LED1_G, LED1_B, HIGH, LOW, HIGH); // Green
-        }
-        else if (category == "Moderate") {
-            setRGB(LED1_R, LED1_G, LED1_B, LOW, LOW, HIGH); // Yellow
-        }
-        else if (category == "Unhealthy_Sensitive") {
-            setRGB(LED1_R, LED1_G, LED1_B, LOW, HIGH, HIGH); // Orange (red on, green off)
-        }
-        else if (category == "Unhealthy") {
-            setRGB(LED1_R, LED1_G, LED1_B, LOW, HIGH, HIGH); // Red
-        }
-        else if (category == "Very_Unhealthy") {
-            setRGB(LED1_R, LED1_G, LED1_B, LOW, HIGH, HIGH); // Red
-            setRGB(LED2_R, LED2_G, LED2_B, LOW, HIGH, HIGH); // Red
-        }
-        else if (category == "Hazardous") {
-            setRGB(LED1_R, LED1_G, LED1_B, LOW, HIGH, HIGH); // Red
-            setRGB(LED2_R, LED2_G, LED2_B, LOW, HIGH, HIGH); // Red
-            setRGB(LED3_R, LED3_G, LED3_B, LOW, HIGH, HIGH); // Red
-        }
+    // Set LEDs according to category
+    if (pm25Sum == 0) {
+      // If the sum is 0, the sensor is probably not functioning.
+      // Set LED3 (instead of LED1) to green.
+      setRGB(LED3_R, LED3_G, LED3_B, HIGH, LOW, HIGH);       // Green
+    }
+    else if (category == "Good") {
+      setRGB(LED1_R, LED1_G, LED1_B, HIGH, LOW, HIGH);       // Green
+    } else if (category == "Moderate") {
+      setRGB(LED1_R, LED1_G, LED1_B, LOW, LOW, HIGH);        // Yellow
+    } else if (category == "Unhealthy_Sensitive") {
+      setRGB(LED1_R, LED1_G, LED1_B, LOW, HIGH, HIGH);       // Orange (red on, green off)
+    } else if (category == "Unhealthy") {
+      setRGB(LED1_R, LED1_G, LED1_B, LOW, HIGH, HIGH);       // Red
+    } else if (category == "Very_Unhealthy") {
+      setRGB(LED1_R, LED1_G, LED1_B, LOW, HIGH, HIGH);       // Red
+      setRGB(LED2_R, LED2_G, LED2_B, LOW, HIGH, HIGH);       // Red
+    } else if (category == "Hazardous") {
+      setRGB(LED1_R, LED1_G, LED1_B, LOW, HIGH, HIGH);       // Red
+      setRGB(LED2_R, LED2_G, LED2_B, LOW, HIGH, HIGH);       // Red
+      setRGB(LED3_R, LED3_G, LED3_B, LOW, HIGH, HIGH);       // Red
+    }
+
 
         // Log to internal SD
         if (internalOK) {
