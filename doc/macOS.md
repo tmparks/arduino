@@ -31,26 +31,3 @@
     cd <dir>
     ./setup.sh
     ```
-
-5.  Edit the file AirQuality.ino in the AirQuality directory
-    to modify `BOX_NUMBER` and other configuration parameters.
-
-6.  Compile the AirQuality sketch.
-    (downloads less than 1 MB, first time only)
-    ```
-    arduino-cli compile AirQuality
-    ```
-
-7.  Upload the AirQuality sketch.
-    * Use a USB cable to connect to a teensy board.
-    * Replace `<port>` below with the port shown for the teensy board.
-    ```
-    arduino-cli board list
-    arduino-cli upload --port <port> AirQuality
-    ```
-
-8.  Monitor messages from the board.
-    * Replace `<port>` below with the port for the teensy board.
-    ```
-    arduino-cli monitor --port <port>
-    ```
