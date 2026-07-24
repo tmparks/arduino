@@ -1,8 +1,8 @@
 # Windows setup
 
 Open the Command Prompt app, found under Windows System in the Start menu.
-* To copy: drag the mouse to select some text, then click with the 2nd mouse button.
-* To paste: click with the 2nd mouse button.
+* To copy: drag the mouse to select some text, then click the 2nd mouse button.
+* To paste: click the 2nd mouse button.
 * To repeat a previous command,
   use the UP and DOWN arrow keys to scroll through the command history.
   Use the BACKSPACE, DELETE, LEFT arrow, and RIGHT arrow keys to edit the command.
@@ -30,7 +30,7 @@ Open the Command Prompt app, found under Windows System in the Start menu.
     for this project.
     (downloads less than 1 MB)
     * To extract all files from the zip archive:
-      click with the 2nd mouse button and select Extract All... from the menu.
+      click the 2nd mouse button and select Extract All... from the menu.
     * Move the resulting directory to a convenient location.
 
     ![extract](extract.png)
