@@ -1,12 +1,13 @@
 # Windows setup
 
 Open the Command Prompt app, found under Windows System in the Start menu.
-* To copy: drag your mouse to select some text, then click with the 2nd mouse button.
+* To copy: drag the mouse to select some text, then click with the 2nd mouse button.
 * To paste: click with the 2nd mouse button.
 * To repeat a previous command,
-  use the up and down arrow keys to scroll through your command history.
-  Use the backspace, delete, left arrow, and right arrow keys to edit the command.
-  Use the enter key to execute the edited command.
+  use the UP and DOWN arrow keys to scroll through the command history.
+  Use the BACKSPACE, DELETE, LEFT arrow, and RIGHT arrow keys to edit the command.
+  Use the ENTER key to execute the edited command
+  or the ESCAPE key to clear the edited command.
 
 ![cmd](cmd.png)
 
@@ -23,7 +24,7 @@ Open the Command Prompt app, found under Windows System in the Start menu.
     for the latest release of [arduino-cli](https://docs.arduino.cc/arduino-cli/installation/#download).
     (downloads less than 20 MB)
     * Launch the MSI installer.
-    * After installation is complete, restart your computer.
+    * After installation is complete, restart the computer.
 
 3.  Download the [code](https://github.com/tmparks/arduino/archive/refs/heads/main.zip)
     for this project.
